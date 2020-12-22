@@ -1,0 +1,64 @@
+
+
+CREATE COMPUTE MODULE Audit_Logging_Compute
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		
+		
+		DECLARE statLogLevel INT CAST( Environment.LOGMESSAGE.LOG_LEVEL AS INT);
+		DECLARE mfLogLevel INT CAST( Environment.Variables.MessageFlow.LOG_LEVEL AS INT);
+		--SET  Environment.Variables.TxnDateTime 			=  CURRENT_TIMESTAMP ;
+			
+				
+		IF(statLogLevel<=mfLogLevel)THEN 
+		    CALL Auditing();
+			RETURN TRUE;
+			ELSE
+		RETURN FALSE;
+		 
+	   END IF;
+	     END;
+		
+		
+		
+
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+	
+	CREATE PROCEDURE Auditing ()
+	BEGIN
+		
+			
+		
+		DECLARE p NAMESPACE 'http://xmlns.yesbank.com/IIB/CommonComponents/IIBLoggerSchema/v1.1';	
+		DECLARE xsi NAMESPACE 'http://www.w3.org/2001/XMLSchema-instance';
+		
+		
+		
+		SET OutputRoot.XMLNSC.p:IIBLogEvent.p:LogEvent.p:ServiceName 		= Environment.Variables.ServiceName;
+		SET OutputRoot.XMLNSC.p:IIBLogEvent.p:LogEvent.p:OperationName 		= Environment.Variables.Operation.Name;
+		SET OutputRoot.XMLNSC.p:IIBLogEvent.p:LogEvent.p:TxnDateTime 		= CURRENT_TIMESTAMP ;
+		SET OutputRoot.XMLNSC.p:IIBLogEvent.p:LogEvent.p:LogDateTime 		= Environment.Variables.LogDateTime ;
+		SET OutputRoot.XMLNSC.p:IIBLogEvent.p:LogEvent.p:TxnRefNo 			= Environment.Variables.TxnRefNo;
+		SET OutputRoot.XMLNSC.p:IIBLogEvent.p:LogEvent.p:MessageFlowName 	= Environment.Variables.MessageFlowName;
+		SET OutputRoot.XMLNSC.p:IIBLogEvent.p:LogEvent.p:LogPoint 			= Environment.Variables.LogPoint;
+		SET OutputRoot.XMLNSC.p:IIBLogEvent.p:LogEvent.p:LogMessage 		= Environment.Variables.LogMessage;
+		SET OutputRoot.XMLNSC.p:IIBLogEvent.p:LogEvent.p:ChannelId 			= Environment.Variables.ChannelId;
+		
+				
+	END;
+	
+	
+END MODULE;

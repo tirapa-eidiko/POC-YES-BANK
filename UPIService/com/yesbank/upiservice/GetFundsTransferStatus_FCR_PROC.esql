@@ -1,0 +1,102 @@
+BROKER SCHEMA com.yesbank.upiservice
+PATH com.yesbank.esb;
+--DECLARE schemaFCR EXTERNAL CHARACTER '';
+
+CREATE COMPUTE MODULE GetFundsTransferStatus_FCR_PROC
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		-- CALL CopyMessageHeaders();
+		-- CALL CopyEntireMessage();
+		DECLARE fundTransfDtls REFERENCE TO InputRoot.XMLNSC.namespace:GetFundsTransferStatusReq.namespace:ReqBody;
+		DECLARE transId, channelId, userId , errorMsg, Logging_Query CHARACTER;
+		DECLARE I INT 1;
+		SET transId		 		= COALESCE(fundTransfDtls.namespace:TransactionId,null);
+		SET channelId		 	= COALESCE(fundTransfDtls.namespace:ChannelId,null);
+		SET userId 				= COALESCE(fundTransfDtls.namespace:UserId,null);
+		
+		SET Logging_Query		= 'CALL PROC_TXN_STATUS('||COALESCE(transId,'')||','||COALESCE(channelId,'')||','||COALESCE(userId,'')||')';
+	--AUDIT_LOGGING
+		SET Environment.Variables.LogMessage  		= CAST(Logging_Query AS BLOB CCSID 1208);
+        SET Environment.Variables.MessageFlowName 	= SQL.MessageFlowLabel;
+	    SET Environment.Variables.LogPoint 			= 'BackendRequest:FCR SPROC';		   
+	    SET Environment.LOGMESSAGE.LOG_LEVEL        = 2;
+	   	PROPAGATE TO TERMINAL 'out2' DELETE NONE;
+	   	
+	   	--Procedure Call
+		CALL PROC_TXN_STATUS(transId,channelId,userId,Environment.Variables.ACC_DTLS[]) IN Database.{schemaFCR}; 
+		
+		IF CARDINALITY(Environment.Variables.ACC_DTLS[]) > '0' THEN
+  			CREATE LASTCHILD OF Environment.Variable.XMLData DOMAIN ('XMLNSC') NAME 'XMLNSC';
+  			SET Environment.Variable.XMLData.XMLNSC.ACC_DTLS[] =Environment.Variables.ACC_DTLS[];
+			CALL AuditMessage(Environment.Variable.XMLData.*[<],'BackendResponse:FCR SPROC',Environment,2);
+  		ELSE
+  			SET Logging_Query = 'NO DATA FOUND';
+  			--AUDIT_LOGGING
+	        SET  Environment.Variables.LogMessage  			= CAST(Logging_Query AS BLOB CCSID 1208);
+			SET  Environment.Variables.MessageFlowName 		= SQL.MessageFlowLabel;
+			SET  Environment.Variables.LogPoint 			= 'BackendResponse:FCR SPROC';		   
+			SET Environment.LOGMESSAGE.LOG_LEVEL            = 2;
+			PROPAGATE TO TERMINAL 'out2' DELETE NONE;
+  		END IF;
+		
+	--Response Headrer construction
+		DECLARE acctDtlsRef ,resHdrRef ,resBodyRef ,envRef REFERENCE TO Environment.Variables[>];
+		 CREATE LASTCHILD OF OutputRoot.XMLNSC AS acctDtlsRef NAMESPACE namespace NAME 'GetFundsTransferStatusRes' ;
+		 	CREATE LASTCHILD OF acctDtlsRef AS resHdrRef NAMESPACE namespace NAME 'ResHdr' ;
+			 SET resHdrRef.ConsumerContext.RequesterID		= envRef.ChannelId;
+			 SET resHdrRef.ServiceContext.ServiceName 		= envRef.ServiceName;
+			 SET resHdrRef.ServiceContext.ReqRefNum 		= envRef.TxnRefNo;
+			 SET resHdrRef.ServiceContext.ReqRefTimeStamp 	= envRef.TxnDateTime;
+			 SET resHdrRef.ServiceContext.ServiceVersionNo 	= envRef.ServiceVersionNo;
+			 SET resHdrRef.ServiceResponse.EsbResTimeStamp	= CURRENT_TIMESTAMP;
+			 
+	--Success
+		IF CARDINALITY(Environment.Variables.ACC_DTLS[]) > '0' THEN
+			DECLARE acctDtlsRefCursor REFERENCE TO Environment.Variables.ACC_DTLS[>];
+			IF((acctDtlsRefCursor.REF_USR_NO = 'NA') AND (acctDtlsRefCursor.REF_TXN_NO = 'NA')) THEN
+				SET resHdrRef.ServiceResponse.EsbResStatus			= '3';
+				SET resHdrRef.ErrorDetails.ErrorInfo.ErrSrc 		= 'FCR';
+				SET resHdrRef.ErrorDetails.ErrorInfo.HostErrDesc 	= 'NO DATA FOUND';
+			ELSE
+				SET resHdrRef.ServiceResponse.EsbResStatus			= '0';
+				CREATE LASTCHILD OF acctDtlsRef AS resBodyRef NAMESPACE namespace NAME 'ResBody' ;
+				SET resBodyRef.namespace:TransactionId 		= acctDtlsRefCursor.REF_USR_NO;
+				SET resBodyRef.namespace:FCRTransactionId 	= acctDtlsRefCursor.REF_TXN_NO;
+			END IF; 
+		END IF;
+		
+		IF(Environment.Variables.JSONMessage = true)THEN
+			SET Environment.VariablesXpath.Array[1]= COALESCE(envRef.Operation.Name,'')||'Res.ResHdr.ErrorDetails';
+			CALL XML2JSONXPATHPROC(OutputRoot,Environment);
+		    SET OutputLocalEnvironment.Destination.HTTP.RequestIdentifier= CAST(envRef.RequestIdentifier AS BLOB);
+	 --AUDIT AND LOGGING
+		    CALL AuditMessage(OutputRoot,'ESBResponseSent',Environment,2);
+		    PROPAGATE TO TERMINAL 'out1';
+		   	RETURN FALSE;
+	    END IF;
+      	SET OutputLocalEnvironment.Destination.SOAP.Reply.ReplyIdentifier=CAST(envRef.RequestIdentifier AS BLOB);
+	--AUDIT AND LOGGING
+		CALL AuditMessage(OutputRoot,'ESBResponseSent',Environment,2);
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+	
+	CREATE PROCEDURE PROC_TXN_STATUS(IN txnId CHARACTER,IN channelId CHARACTER,IN userId CHARACTER)
+	LANGUAGE DATABASE
+	DYNAMIC RESULT SETS 1
+	EXTERNAL NAME "PROC_TXN_STATUS";
+	
+END MODULE;

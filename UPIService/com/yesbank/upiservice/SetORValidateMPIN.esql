@@ -1,0 +1,132 @@
+BROKER SCHEMA com.yesbank.upiservice
+PATH com.yesbank.esb;
+
+CREATE COMPUTE MODULE SetORValidateMPIN_RequestEnv
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+
+		DECLARE inputref REFERENCE TO InputRoot.XMLNSC.*:SetORValidateMPINReq.*:ReqBody;
+
+		SET OutputRoot.JSON.Data.customerID = inputref.*:CustomerId;
+		SET OutputRoot.JSON.Data.mpin = inputref.*:MPIN;
+		--AUDIT_LOGGING
+		CALL AuditMessage(OutputRoot.*[<],'BackendRequest:Robosoft API',Environment,2);
+
+		IF inputref.*:RequestType = 'Generate' THEN
+			SET OutputLocalEnvironment.Destination.HTTP.RequestURL = getPolicyProperty(Environment.Variables.UserConfigurableServiceName,'Store_URL');
+
+		ELSE
+			SET OutputLocalEnvironment.Destination.HTTP.RequestURL = getPolicyProperty(Environment.Variables.UserConfigurableServiceName,'Validate_URL');
+
+		END IF;
+
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;
+
+CREATE COMPUTE MODULE SetORValidateMPIN_API_RES
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		-- AUDIT_LOGGING
+		CALL AuditMessage(InputRoot.*[<],'BackendResponse:Robosoft API',Environment,2);
+
+		IF(InputRoot.BLOB.BLOB IS NOT NULL)THEN
+		THROW USER EXCEPTION MESSAGE 3021 VALUES ('Received fault from Host' || CAST(ASBITSTREAM(InputRoot.BLOB) AS CHAR CCSID 1208));
+	END IF;
+
+	DECLARE envRef REFERENCE TO Environment.Variables;
+	DECLARE inpRef REFERENCE TO InputRoot.JSON.Data;
+
+	IF Environment.Variables.ChannelId = 'RNB' OR Environment.Variables.ChannelId = 'OBD' THEN
+		SET OutputRoot.XMLNSC.namespace:SetORValidateMPINRes.namespace:ResHdr.ConsumerContext.RequesterID = envRef.ChannelId;
+		SET OutputRoot.XMLNSC.namespace:SetORValidateMPINRes.namespace:ResHdr.ServiceContext.ServiceName = envRef.ServiceName;
+		SET OutputRoot.XMLNSC.namespace:SetORValidateMPINRes.namespace:ResHdr.ServiceContext.ReqRefNum = envRef.TxnRefNo;
+		SET OutputRoot.XMLNSC.namespace:SetORValidateMPINRes.namespace:ResHdr.ServiceContext.ReqRefTimeStamp = envRef.TxnDateTime;
+		SET OutputRoot.XMLNSC.namespace:SetORValidateMPINRes.namespace:ResHdr.ServiceContext.ServiceVersionNo = envRef.ServiceVersionNo;
+		SET OutputRoot.XMLNSC.namespace:SetORValidateMPINRes.namespace:ResHdr.ServiceResponse.EsbResTimeStamp = CURRENT_TIMESTAMP;
+		SET Environment.Variables.MessageFlowName = SQL.MessageFlowLabel;
+
+		IF inpRef.status = '0' THEN
+			SET OutputRoot.XMLNSC.namespace:SetORValidateMPINRes.namespace:ResHdr.ServiceResponse.EsbResStatus = inpRef.status;
+
+		ELSE
+
+			SET OutputRoot.XMLNSC.namespace:SetORValidateMPINRes.namespace:ResHdr.ServiceResponse.EsbResStatus = '1';
+			SET OutputRoot.XMLNSC.namespace:SetORValidateMPINRes.namespace:ResHdr.ErrorDetails.ErrorInfo.ErrSrc = 'FAILURE';
+			SET OutputRoot.XMLNSC.namespace:SetORValidateMPINRes.namespace:ResHdr.ErrorDetails.ErrorInfo.HostErrCode = inpRef.status;
+			SET OutputRoot.XMLNSC.namespace:SetORValidateMPINRes.namespace:ResHdr.ErrorDetails.ErrorInfo.HostErrDesc = inpRef.message;
+
+		END IF;
+
+	ELSE
+		SET OutputRoot.XMLNSC.*:SetORValidateMPINRes.*:ResHdr.ConsumerContext.RequesterID = envRef.ChannelId;
+		SET OutputRoot.XMLNSC.*:SetORValidateMPINRes.*:ResHdr.ServiceContext.ServiceName = envRef.ServiceName;
+		SET OutputRoot.XMLNSC.*:SetORValidateMPINRes.*:ResHdr.ServiceContext.ReqRefNum = envRef.TxnRefNo;
+		SET OutputRoot.XMLNSC.*:SetORValidateMPINRes.*:ResHdr.ServiceContext.ReqRefTimeStamp = envRef.TxnDateTime;
+		SET OutputRoot.XMLNSC.*:SetORValidateMPINRes.*:ResHdr.ServiceContext.ServiceVersionNo = envRef.ServiceVersionNo;
+		SET OutputRoot.XMLNSC.*:SetORValidateMPINRes.*:ResHdr.ServiceResponse.EsbResTimeStamp = CURRENT_TIMESTAMP;
+		SET Environment.Variables.MessageFlowName = SQL.MessageFlowLabel;
+
+		IF inpRef.status = '0' THEN
+			SET OutputRoot.XMLNSC.*:SetORValidateMPINRes.*:ResHdr.ServiceResponse.EsbResStatus = inpRef.status;
+
+		ELSE
+
+			SET OutputRoot.XMLNSC.*:SetORValidateMPINRes.*:ResHdr.ServiceResponse.EsbResStatus = '1';
+			SET OutputRoot.XMLNSC.*:SetORValidateMPINRes.*:ResHdr.ErrorDetails.ErrorInfo.ErrSrc = 'FAILURE';
+			SET OutputRoot.XMLNSC.*:SetORValidateMPINRes.*:ResHdr.ErrorDetails.ErrorInfo.HostErrCode = inpRef.status;
+			SET OutputRoot.XMLNSC.*:SetORValidateMPINRes.*:ResHdr.ErrorDetails.ErrorInfo.HostErrDesc = inpRef.message;
+
+		END IF;
+	END IF;		   
+
+
+
+
+	IF(Environment.Variables.JSONMessage = TRUE) THEN
+
+	SET Environment.VariablesXpath.Array[1] = COALESCE(Environment.Variables.Operation.Name,'')||'Res.ResHdr.ErrorDetails';
+	-- XML2JSON
+	CALL XML2JSONXPATHPROC(OutputRoot,Environment);
+	-- AUDIT_LOGGING
+	CALL AuditMessage(OutputRoot.*[<],'ESBResponseSent',Environment,2);
+	SET OutputLocalEnvironment.Destination.HTTP.RequestIdentifier = CAST(Environment.Variables.RequestIdentifier AS BLOB);
+	PROPAGATE TO TERMINAL 'out1';
+
+	RETURN FALSE;
+END IF;
+-- AUDIT_LOGGING
+CALL AuditMessage(OutputRoot.*[<],'ESBResponseSent',Environment,2);
+SET OutputLocalEnvironment.Destination.SOAP.Reply.ReplyIdentifier = CAST(Environment.Variables.RequestIdentifier AS BLOB);
+
+RETURN TRUE;
+END;
+
+CREATE PROCEDURE CopyMessageHeaders() BEGIN
+	DECLARE I INTEGER 1;
+	DECLARE J INTEGER;
+	SET J = CARDINALITY(InputRoot.*[]);
+	WHILE I < J DO
+		SET OutputRoot.*[I] = InputRoot.*[I];
+		SET I = I + 1;
+	END WHILE;
+END;
+
+CREATE PROCEDURE CopyEntireMessage() BEGIN
+	SET OutputRoot = InputRoot;
+END;
+END MODULE;

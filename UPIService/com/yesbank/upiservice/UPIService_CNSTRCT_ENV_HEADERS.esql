@@ -1,0 +1,144 @@
+BROKER SCHEMA com.yesbank.upiservice
+
+PATH com.yesbank.esb;
+
+DECLARE namespace NAMESPACE 'http://xmlns.yesbank.com/WS/UPIService';
+DECLARE ServiceVersion EXTERNAL CHARACTER '';
+
+CREATE COMPUTE MODULE UPIService_CNSTRCT_ENV_HEADERS
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		CALL CopyMessageHeaders();
+
+		SET  Environment.targetNameSpace = namespace;
+        SET Environment.Variables.UserConfigurableServiceName = '{UPIServicePolicies}:UPIService';
+        
+      	--Save header in Environment
+        CALL setEnvForLogging(Environment,InputRoot,InputLocalEnvironment);
+           
+        SET Environment.Variables.MessageFlow.LOG_LEVEL = CAST(getPolicyProperty(Environment.Variables.UserConfigurableServiceName, Environment.Variables.Operation.Name||'_LOG_LEVEL') AS INT);
+	    
+	    --AUDIT_LOGGING 
+		CALL AuditMessage(InputRoot.*[<],'ESBRequestReceived',Environment,2);
+        --Validate Manadatory Header Fields
+        DECLARE channelIdList CHAR getPolicyProperty(Environment.Variables.UserConfigurableServiceName,'channelIdList');
+		CALL validateRequestHeader(InputRoot.*[<],'UPIService',channelIdList);
+
+        IF( ServiceVersion <> Environment.Variables.ServiceVersionNo )THEN
+			THROW USER EXCEPTION MESSAGE
+			2951 VALUES('Incorrect data ','correct version no is not present in header ');
+	    END IF;
+
+        IF(Environment.Variables.JSONMessage)THEN
+		  	CREATE LASTCHILD OF OutputRoot DOMAIN 'XMLNSC' NAME 'XMLNSC';
+		  	--To Convert JSON2XML
+		  	CALL JSONTOXMLPROC (InputRoot.JSON.Data, OutputRoot.XMLNSC,Environment.targetNameSpace,Environment);
+			SET OutputLocalEnvironment = InputLocalEnvironment;	
+			SET OutputLocalEnvironment.Destination.RouterList.DestinationData.labelName = Environment.Variables.Operation.Name;
+
+	  	ELSE 
+			CALL CopyEntireMessage();
+			SET OutputLocalEnvironment = InputLocalEnvironment;	
+			END IF;
+
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;
+
+
+-- CODE FOR ESB ERROR RESPONSE
+CREATE COMPUTE MODULE UPIService_INTEGRATION_ESBFailureResponse
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		SET OutputLocalEnvironment = InputLocalEnvironment;
+		DECLARE envVariables REFERENCE TO  Environment.Variables;      
+        
+        IF(LASTMOVE(envVariables)<> true)THEN 
+        	CALL setEnvForLogging(Environment,InputRoot,InputLocalEnvironment);
+	        IF(Environment.Variables.Operation.Name IS NULL OR Environment.Variables.Operation.Name ='')THEN        
+	        	SET Environment.Variables.Operation.Name = COALESCE(SUBSTRING(SUBSTRING(SUBSTRING(InputRoot.HTTPInputHeader."X-Original-HTTP-Command" FROM POSITION('/' IN InputRoot.HTTPInputHeader."X-Original-HTTP-Command" REPEAT 4)) AFTER '/') BEFORE ' '),Environment.Service.Operation.Name);
+	        END IF;
+	    END IF;
+	    
+		CREATE LASTCHILD OF OutputRoot DOMAIN 'XMLNSC' NAME 'XMLNSC';
+		
+			CREATE LASTCHILD OF OutputRoot.XMLNSC
+	        TYPE Name
+	        NAMESPACE namespace 
+	        NAME COALESCE(Environment.Variables.Operation.Name,'')||'Res';
+	        
+	        DECLARE outRef REFERENCE TO OutputRoot.XMLNSC;
+	        
+		SET outRef.*.namespace:ResHdr.ConsumerContext.RequesterID       					= Environment.Variables.ChannelId;
+		SET outRef.*.namespace:ResHdr.ServiceContext.ServiceName        					= Environment.Variables.ServiceName;
+		SET outRef.*.namespace:ResHdr.ServiceContext.ReqRefNum    	   						= Environment.Variables.TxnRefNo;
+		SET outRef.*.namespace:ResHdr.ServiceContext.ReqRefTimeStamp     					= Environment.Variables.TxnDateTime;
+		SET outRef.*.namespace:ResHdr.ServiceContext.ServiceVersionNo    					= Environment.Variables.ServiceVersionNo;
+		SET outRef.*.namespace:ResHdr.ServiceResponse.EsbResTimeStamp    					= CURRENT_TIMESTAMP;
+	    SET outRef.*.namespace:ResHdr.ServiceResponse.EsbResStatus       					= '1';
+	    SET outRef.*.namespace:ResHdr.ErrorDetails.ErrorInfo.ErrSrc 						= 'ESB';
+		SET outRef.*.namespace:ResHdr.ErrorDetails.ErrorInfo.EsbErrCode 					= Environment.ErrorInfo.EsbErrCode;
+		SET outRef.*.namespace:ResHdr.ErrorDetails.ErrorInfo.EsbErrLongDesc 				= Environment.ErrorInfo.EsbErrLongDesc;
+		SET outRef.*.namespace:ResHdr.ErrorDetails.ErrorInfo.EsbErrShortDesc 				= Environment.ErrorInfo.EsbErrShortDesc;
+		
+	   	IF(Environment.Variables.JSONMessage = true)THEN
+		 	SET Environment.VariablesXpath.Array[1]= COALESCE(Environment.Variables.Operation.Name,'')||'Res.ResHdr.ErrorDetails';
+		 	CALL XML2JSONXPATHPROC(OutputRoot,Environment);
+	    
+		    SET OutputLocalEnvironment.Destination.HTTP.ReplyStatusCode  	= '500';
+		    SET OutputLocalEnvironment.Destination.HTTP.RequestIdentifier 	= CAST(Environment.Variables.RequestIdentifier AS BLOB);
+		 	--AUDIT_LOGGING 
+	      	CALL AuditMessage(OutputRoot.*[<],'ESBResponseSent',Environment,2);
+		   
+		   	PROPAGATE TO TERMINAL 'out1';
+		   
+	    RETURN FALSE;
+	    END IF;
+       		SET OutputLocalEnvironment.Destination.SOAP.Reply.Transport.HTTP.ReplyStatusCode = '500';
+       		SET OutputLocalEnvironment.Destination.SOAP.Reply.ReplyIdentifier = CAST(Environment.Variables.RequestIdentifier AS BLOB);
+       		--AUDIT_LOGGING
+       		CALL AuditMessage(OutputRoot.*[<],'ESBResponseSent',Environment,2);
+      
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;
+
+
+	--AUDIT_LOGGING
+	CREATE PROCEDURE AuditMessage(IN Message REFERENCE,IN LOGPoint CHAR,IN envRef REFERENCE,IN LOGLEVEL INT) BEGIN
+		
+		 SET  envRef.Variables.LogMessage  			= ASBITSTREAM(Message OPTIONS FolderBitStream CCSID 1208);
+		 SET  envRef.Variables.MessageFlowName 		= SQL.MessageFlowLabel;
+		 SET  envRef.Variables.LogPoint 			= LOGPoint;		   
+		 SET  envRef.LOGMESSAGE.LOG_LEVEL           = LOGLEVEL;
+	    PROPAGATE TO TERMINAL 'out2' DELETE NONE;
+	END;
+

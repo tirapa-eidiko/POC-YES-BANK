@@ -1,0 +1,45 @@
+
+
+CREATE COMPUTE MODULE ValidateMPIN_Compute
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		
+		--{"customerID":"332","mpin":"98cb000898f91229680a8893f10d675a670470facfcd4f8093571e3e18466808"}
+		--{"validMpin":"true","message":"Valid Mpin","status":"0"}
+		--{"message":"Invalid MPIN 2 out of 3 tries remaining","status":"Y202"}
+		DECLARE customerID,mpin CHARACTER;
+		
+		SET customerID= InputRoot.JSON.Data.customerID;
+		SET mpin=InputRoot.JSON.Data.mpin;
+		
+		IF (customerID='332' and mpin='98cb000898f91229680a8893f10d675a670470facfcd4f8093571e3e18466808') THEN
+			
+			SET OutputRoot.JSON.Data.validMpin='true';
+			SET OutputRoot.JSON.Data.message='Valid Mpin';
+			SET OutputRoot.JSON.Data.status='0';
+			
+		ELSE
+			
+			SET OutputRoot.JSON.Data.message='Invalid MPIN 2 out of 3 tries remaining';
+			SET OutputRoot.JSON.Data.status='Y202';
+			
+		END IF;
+		
+		
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;

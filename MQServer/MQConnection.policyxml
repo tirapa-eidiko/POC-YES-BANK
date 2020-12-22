@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<policies>
+  <policy policyType="MQEndpoint" policyName="MQConnection" policyTemplate="MQEndpoint">
+    <connection>CLIENT</connection>
+    <destinationQueueManagerName>DEMOQMGR</destinationQueueManagerName>
+    <queueManagerHostname>192.168.3.160</queueManagerHostname>
+    <listenerPortNumber>1515</listenerPortNumber>
+    <channelName>SVRCONN</channelName>
+    <securityIdentity>MQSecurity</securityIdentity>
+    <useSSL>false</useSSL>
+    <SSLPeerName></SSLPeerName>
+    <SSLCipherSpec></SSLCipherSpec>
+  </policy>
+</policies>

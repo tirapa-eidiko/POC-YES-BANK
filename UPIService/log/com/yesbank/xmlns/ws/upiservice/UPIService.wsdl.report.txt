@@ -1,0 +1,42 @@
+
+
+Importing file: E:\Anil\Workspace\Kaizala\ServiceCatalog\UPI_FundTransferStatus_Req\UPIService\UPIService.wsdl
+
+The WSDL import will proceed with bindings UPIServiceSoapHttpBindings.
+Creating wsdl schema document for file:///E:/Anil/Workspace/Kaizala/ServiceCatalog/UPI_FundTransferStatus_Req/UPIService/UPIService.wsdl.
+Parsing wsdl binding {http://xmlns.yesbank.com/WS/UPIService}UPIServiceSoapHttpBindings.
+Parsing wsdl binding input GetAccountList.
+Parsing wsdl binding output GetAccountList.
+Parsing wsdl binding input GetCustomerIdList.
+Parsing wsdl binding output GetCustomerIdList.
+Parsing wsdl binding input SetORValidateMPIN.
+Parsing wsdl binding output SetORValidateMPIN.
+Parsing wsdl binding input GetExpiryDate.
+Parsing wsdl binding output GetExpiryDate.
+Parsing wsdl binding input GetHashKey.
+Parsing wsdl binding output GetHashKey.
+Parsing wsdl binding input GetLatestAadhaarLinkedAcc.
+Parsing wsdl binding output GetLatestAadhaarLinkedAcc.
+Parsing wsdl binding input GetFundsTransferStatus.
+Parsing wsdl binding output GetFundsTransferStatus.
+Processing doc style for operation GetAccountList.
+Processing doc style for operation GetCustomerIdList.
+Processing doc style for operation SetORValidateMPIN.
+Processing doc style for operation GetExpiryDate.
+Processing doc style for operation GetHashKey.
+Processing doc style for operation GetLatestAadhaarLinkedAcc.
+Processing doc style for operation GetFundsTransferStatus.
+Populating WSDL schema UPIService_wsdl.xsd.
+Creating file UPIService_wsdl.xsd in the workspace.
+Creating file /UPIService/UPIService/UPIService.xsd in the workspace.
+Creating file /UPIService/CommonSchema/commontypes.xsd in the workspace.
+Creating file UPIService_InlineSchema2.xsd in the workspace.
+Copying source WSDL UPIService.wsdl to UPIService.wsdl.
+
+Elapsed time processing this message definition file: 1.267 seconds
+Number of warnings for this message definition file: 0
+
+
+Number of files processed: 1
+
+

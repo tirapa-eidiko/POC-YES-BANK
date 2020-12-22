@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ecore:EPackage xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:ComIbmCompute.msgnode="ComIbmCompute.msgnode" xmlns:ComIbmWSRequest.msgnode="ComIbmWSRequest.msgnode" xmlns:ecore="http://www.eclipse.org/emf/2002/Ecore" xmlns:eflow="http://www.ibm.com/wbi/2005/eflow" xmlns:utility="http://www.ibm.com/wbi/2005/eflow_utility" nsURI="com/yesbank/upiservice/GetHashKey.subflow" nsPrefix="com_yesbank_upiservice_GetHashKey.subflow">
+  <eClassifiers xmi:type="eflow:FCMComposite" name="FCMComposite_1" useDefaults="true" udpSupport="true">
+    <eSuperTypes href="http://www.ibm.com/wbi/2005/eflow#//FCMBlock"/>
+    <eStructuralFeatures xmi:type="ecore:EAttribute" xmi:id="Property.timeoutForServer" name="timeoutForServer" lowerBound="1" defaultValueLiteral="120">
+      <eType xmi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EInt"/>
+    </eStructuralFeatures>
+    <eStructuralFeatures xmi:type="ecore:EAttribute" xmi:id="Property.URLSpecifier" name="URLSpecifier" lowerBound="1" defaultValueLiteral="http://localhost:7800/ybsecurity/api/getHashkey">
+      <eType xmi:type="ecore:EDataType" href="http://www.eclipse.org/emf/2002/Ecore#//EString"/>
+    </eStructuralFeatures>
+    <translation xmi:type="utility:TranslatableString" key="GetHashKey" bundleName="com/yesbank/upiservice/GetHashKey" pluginId="UPIService"/>
+    <colorGraphic16 xmi:type="utility:GIFFileGraphic" resourceName="platform:/plugin/UPIService/icons/full/obj16/GetHashKey.gif"/>
+    <colorGraphic32 xmi:type="utility:GIFFileGraphic" resourceName="platform:/plugin/UPIService/icons/full/obj30/GetHashKey.gif"/>
+    <composition>
+      <nodes xmi:type="eflow:FCMSource" xmi:id="InTerminal.Input" location="20,20">
+        <translation xmi:type="utility:TranslatableString" key="InTerminal.Input" bundleName="com/yesbank/upiservice/GetHashKey" pluginId="UPIService"/>
+      </nodes>
+      <nodes xmi:type="eflow:FCMSink" xmi:id="OutTerminal.Output" location="727,24">
+        <translation xmi:type="utility:TranslatableString" key="OutTerminal.Audit_login" bundleName="com/yesbank/upiservice/GetHashKey" pluginId="UPIService"/>
+      </nodes>
+      <nodes xmi:type="ComIbmCompute.msgnode:FCMComposite_1" xmi:id="FCMComposite_1_1" location="146,32" computeExpression="esql://routine/com.yesbank.upiservice#GetHashKey_RequestEnv.Main" computeMode="destinationAndMessage">
+        <translation xmi:type="utility:ConstantString" string="Request_API"/>
+      </nodes>
+      <nodes xmi:type="ComIbmCompute.msgnode:FCMComposite_1" xmi:id="FCMComposite_1_2" location="529,148" computeExpression="esql://routine/com.yesbank.upiservice#GetHashKey_API_RES.Main" computeMode="destinationAndMessage">
+        <translation xmi:type="utility:ConstantString" string="ESB_RES"/>
+      </nodes>
+      <nodes xmi:type="ComIbmWSRequest.msgnode:FCMComposite_1" xmi:id="FCMComposite_1_3" location="318,125" URLSpecifier="http://localhost:7080/stub" protocol="TLS" messageDomainProperty="JSON">
+        <translation xmi:type="utility:ConstantString" string="Robosoft API Call"/>
+      </nodes>
+      <nodes xmi:type="eflow:FCMSink" xmi:id="OutTerminal.Output1" location="697,153">
+        <translation xmi:type="utility:TranslatableString" key="OutTerminal.SOAP" bundleName="com/yesbank/upiservice/GetHashKey" pluginId="UPIService"/>
+      </nodes>
+      <nodes xmi:type="eflow:FCMSink" xmi:id="OutTerminal.Output2" location="718,276">
+        <translation xmi:type="utility:TranslatableString" key="OutTerminal.HTTP" bundleName="com/yesbank/upiservice/GetHashKey" pluginId="UPIService"/>
+      </nodes>
+      <connections xmi:type="eflow:FCMConnection" xmi:id="FCMConnection_1" targetNode="FCMComposite_1_1" sourceNode="InTerminal.Input" sourceTerminalName="OutTerminal.out" targetTerminalName="InTerminal.in"/>
+      <connections xmi:type="eflow:FCMConnection" xmi:id="FCMConnection_2" targetNode="FCMComposite_1_3" sourceNode="FCMComposite_1_1" sourceTerminalName="OutTerminal.out" targetTerminalName="InTerminal.in"/>
+      <connections xmi:type="eflow:FCMConnection" xmi:id="FCMConnection_3" targetNode="OutTerminal.Output" sourceNode="FCMComposite_1_1" sourceTerminalName="OutTerminal.out2" targetTerminalName="InTerminal.in"/>
+      <connections xmi:type="eflow:FCMConnection" xmi:id="FCMConnection_4" targetNode="FCMComposite_1_2" sourceNode="FCMComposite_1_3" sourceTerminalName="OutTerminal.out" targetTerminalName="InTerminal.in"/>
+      <connections xmi:type="eflow:FCMConnection" xmi:id="FCMConnection_5" targetNode="FCMComposite_1_2" sourceNode="FCMComposite_1_3" sourceTerminalName="OutTerminal.error" targetTerminalName="InTerminal.in"/>
+      <connections xmi:type="eflow:FCMConnection" xmi:id="FCMConnection_6" targetNode="OutTerminal.Output1" sourceNode="FCMComposite_1_2" sourceTerminalName="OutTerminal.out" targetTerminalName="InTerminal.in"/>
+      <connections xmi:type="eflow:FCMConnection" xmi:id="FCMConnection_7" targetNode="OutTerminal.Output2" sourceNode="FCMComposite_1_2" sourceTerminalName="OutTerminal.out1" targetTerminalName="InTerminal.in"/>
+      <connections xmi:type="eflow:FCMConnection" xmi:id="FCMConnection_8" targetNode="OutTerminal.Output" sourceNode="FCMComposite_1_2" sourceTerminalName="OutTerminal.out2" targetTerminalName="InTerminal.in"/>
+    </composition>
+    <propertyOrganizer>
+      <propertyDescriptor groupName="Group.Basic" propertyEditor="com.ibm.etools.mft.ibmnodes.editors.PositiveIntegerPropertyEditor" configurable="true" describedAttribute="Property.timeoutForServer">
+        <propertyName xmi:type="utility:TranslatableString" key="Property.timeoutForServer" bundleName="ComIbmWSRequest" pluginId="com.ibm.etools.mft.ibmnodes.definitions"/>
+        <propertyDescriptor groupName="Group.Basic" propertyEditor="com.ibm.etools.mft.ibmnodes.editors.URLPropertyEditor" configurable="true" describedAttribute="Property.URLSpecifier">
+          <propertyName xmi:type="utility:TranslatableString" key="Property.URLSpecifier" bundleName="ComIbmWSRequest" pluginId="com.ibm.etools.mft.ibmnodes.definitions"/>
+        </propertyDescriptor>
+      </propertyDescriptor>
+    </propertyOrganizer>
+    <attributeLinks promotedAttribute="Property.timeoutForServer" overriddenNodes="FCMComposite_1_3">
+      <overriddenAttribute href="ComIbmWSRequest.msgnode#Property.timeoutForServer"/>
+    </attributeLinks>
+    <attributeLinks promotedAttribute="Property.URLSpecifier" overriddenNodes="FCMComposite_1_3">
+      <overriddenAttribute href="ComIbmWSRequest.msgnode#Property.URLSpecifier"/>
+    </attributeLinks>
+    <stickyBoard/>
+  </eClassifiers>
+</ecore:EPackage>

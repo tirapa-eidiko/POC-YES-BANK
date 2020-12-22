@@ -1,0 +1,94 @@
+BROKER SCHEMA com.yesbank.esb
+
+
+
+
+CREATE COMPUTE MODULE JSON2XML
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		CALL CopyMessageHeaders();
+		
+		
+		
+		CREATE LASTCHILD OF OutputRoot DOMAIN 'XMLNSC';
+		CALL copyChildren (InputRoot.JSON.Data, OutputRoot.XMLNSC,Environment.targetNameSpace);
+		
+		
+		RETURN TRUE;
+	END;
+
+	
+
+CREATE FUNCTION copyChildren(In rootNodeJSON REFERENCE, In rootNodeXMLNSC REFERENCE,In namespace NAMESPACE)
+BEGIN
+	
+
+	MOVE rootNodeJSON FirstChild;
+	
+	WHILE LASTMOVE(rootNodeJSON) DO
+	IF FIELDTYPE(rootNodeJSON) = JSON.Array THEN
+		SET Environment.name=FIELDNAME(rootNodeJSON);
+	    MOVE rootNodeJSON  FirstChild;
+	
+	    WHILE LASTMOVE( rootNodeJSON ) DO
+	    CALL CreateChildASCopy(rootNodeJSON,rootNodeXMLNSC,Environment.name,namespace);
+	    MOVE rootNodeJSON  NEXTSIBLING; 
+	    END WHILE;
+	ELSE 
+		CALL CreateChildASCopy(rootNodeJSON,rootNodeXMLNSC,null,namespace);
+	
+	END IF;
+	
+	MOVE rootNodeJSON  NEXTSIBLING; 
+	END WHILE;
+	END ;
+
+
+
+CREATE FUNCTION CreateChildASCopy(In rootNodeJSON REFERENCE, In rootNodeXMLNSC REFERENCE, IN name CHAR,In namespace CHAR )
+BEGIN
+	 
+	 IF(name IS NULL)THEN
+	 SET name=FIELDNAME(rootNodeJSON);
+	 END IF;
+	    IF(name IN ('ConsumerContext','RequesterID','ServiceContext','ServiceName','OperationName','ReqRefNum','ReqRefTimeStamp','ServiceVersionNo'))THEN
+	 SET namespace = '';
+	 END IF;
+	 IF(FIELDVALUE(rootNodeJSON)='')THEN
+		THROW USER EXCEPTION MESSAGE
+		2951 VALUES('Blank value :',FIELDNAME(rootNodeJSON)||' is empty');
+	 END IF;
+	
+	 IF(FIELDTYPE( rootNodeJSON)=Name OR FIELDTYPE( rootNodeJSON)=NameValue)THEN
+	 CREATE LASTCHILD OF rootNodeXMLNSC 
+	 AS rootNodeXMLNSC 
+	 TYPE FIELDTYPE( rootNodeJSON)
+	 NAMESPACE namespace 
+	 NAME name
+	 VALUE FIELDVALUE(rootNodeJSON);
+     END IF;
+    
+     CALL copyChildren(rootNodeJSON,rootNodeXMLNSC,namespace);
+
+	END;
+
+	
+
+
+
+
+		
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;

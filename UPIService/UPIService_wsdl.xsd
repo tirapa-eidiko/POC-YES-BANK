@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?><xsd:schema targetNamespace="http://xmlns.yesbank.com/WS/UPIService" xmlns:tns="http://xmlns.yesbank.com/WS/UPIService" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <xsd:include schemaLocation="UPIService_InlineSchema2.xsd"/>
+  <xsd:include schemaLocation="UPIService/UPIService.xsd"/>
+
+<!-- BEGIN Global group petaining to all wsdl:message definitions -->
+<!-- END Global group -->
+
+
+<!-- BEGIN Message Definitions for the wsdl:operations  -->
+<!-- END Message Definitions -->
+
+
+</xsd:schema>

@@ -1,0 +1,673 @@
+BROKER SCHEMA com.yesbank.esb
+
+-- CREATE FUNCTION getUserDefinedConfigServProp( IN ServiceName CHARACTER ,IN Property CHARACTER)  RETURNS CHAR 
+-- LANGUAGE JAVA   EXTERNAL NAME "com.yesbank.esb.UserConfigurableService.getUserDefinedConfigServProp";
+-- 
+ CREATE FUNCTION getPolicyProperty( IN PolicyName CHARACTER ,IN Property CHARACTER)  RETURNS CHAR 
+ LANGUAGE JAVA   EXTERNAL NAME "com.yesbank.esb.UserConfigurableService.getPolicyProperty";
+  
+ CREATE FUNCTION getCustomerId( IN custId CHAR)  RETURNS CHAR 
+ LANGUAGE JAVA   EXTERNAL NAME "com.yesbank.esb.EncryptCustomerId.hashedCode";
+ 
+ CREATE FUNCTION getCheckSum( IN checkSum CHAR)  RETURNS CHAR 
+ LANGUAGE JAVA   EXTERNAL NAME "com.yesbank.esb.UtilityJava.checkSumValue";
+ 
+ CREATE FUNCTION getEGProperty(IN EGName CHAR, IN PropertyKey CHAR)  RETURNS CHAR 
+ LANGUAGE JAVA   EXTERNAL NAME "com.yesbank.esb.UserConfigurableService.getEGProperty";
+ 
+-- CREATE FUNCTION getEG( ) RETURNS CHAR
+-- LANGUAGE JAVA
+-- EXTERNAL NAME "com.yesbank.esb.UserConfigurableService.getEGUUID";
+-- 
+ 
+ CREATE PROCEDURE setEnvForLogging (IN envRef REFERENCE, IN inputRootRef REFERENCE,IN localEnvRef REFERENCE)
+BEGIN
+     
+      
+      DECLARE uri CHARACTER;
+     DECLARE payload REFERENCE TO inputRootRef.*[<];             
+     
+      DECLARE  mqrfh2Ref REFERENCE TO  inputRootRef.MQRFH2.usr.Environment.Variables;
+     
+      IF(LASTMOVE(mqrfh2Ref))THEN
+     
+      SET envRef.Variables =mqrfh2Ref;
+    
+    ELSE    
+     IF(FIELDNAME(payload) ='JSON' OR inputRootRef.HTTPInputHeader."Content-Type"= 'application/json')THEN
+     MOVE payload  FIRSTCHILD;
+     SET  envRef.Variables.JSONMessage= true;
+     
+      ----- getting operation name from URI ----
+    
+    DECLARE pos INTEGER;
+    DECLARE len INTEGER;
+    SET uri = localEnvRef.HTTP.Input.RequestLine.RequestURI;
+    WHILE (CONTAINS(uri,'/')) DO
+          SET len = LENGTH(uri);
+          SET pos = POSITION('/' IN uri);
+          SET uri = RIGHT(uri,(len-pos));
+    END WHILE;
+
+    --SET Environment.Variable.OperationName = uri;
+    ----- getting operation name from URI ----
+    
+    END IF;
+    MOVE payload  TO payload.*[<];
+    
+  
+     
+  --  MOVE payload  TO payload.*:{COALESCE(envRef.Variables.Operation.Name,'')||'Req'};
+   --SET  envRef.Variables.Operation.Name       = COALESCE(SUBSTRING(SUBSTRING(localEnvRef.HTTP.Input.RequestLine.RequestURI FROM POSITION('/' IN localEnvRef.HTTP.Input.RequestLine.RequestURI REPEAT 2)) AFTER '/'),localEnvRef.Destination.RouterList.DestinationData.labelName);
+   SET  envRef.Variables.Operation.Name         = COALESCE(uri,localEnvRef.Destination.RouterList.DestinationData.labelName);
+      
+    SET  envRef.Variables.ChannelId                   = COALESCE(payload.*:ReqHdr.*:ConsumerContext.*:RequesterID,'');
+      SET  envRef.Variables.ServiceName               = COALESCE(payload.*:ReqHdr.*:ServiceContext.*:ServiceName,'');
+      SET  envRef.Variables.TxnRefNo                      = COALESCE(payload.*:ReqHdr.*:ServiceContext.*:ReqRefNum,'');
+      SET  envRef.Variables.TxnDateTime               = COALESCE(payload.*:ReqHdr.*:ServiceContext.*:ReqRefTimeStamp,'');
+      SET  envRef.Variables.ServiceVersionNo        = COALESCE(payload.*:ReqHdr.*:ServiceContext.*:ServiceVersionNo,'');
+      SET  envRef.Variables.RequestIdentifier    = COALESCE(localEnvRef.Destination.HTTP.RequestIdentifier,localEnvRef.Destination.SOAP.Reply.ReplyIdentifier);                  
+      
+   END IF;
+
+ END;
+
+
+ CREATE FUNCTION getCustomerIDCheck(IN CustIDLenPad CHARACTER)  RETURNS CHARACTER
+ LANGUAGE JAVA   EXTERNAL NAME "com.yesbank.esb.UtilityJava.fillZeros";
+ 
+ CREATE PROCEDURE validateRequestHeader(IN reqRef REFERENCE,IN serviceName CHAR, IN channelIdList CHAR)
+BEGIN
+	
+	IF(FIELDNAME(reqRef) ='JSON')THEN
+	MOVE reqRef FirstChild;
+    END IF;
+    MOVE reqRef  TO reqRef.*[<];
+	IF (reqRef.*:ReqHdr.*:ConsumerContext.*:RequesterID IS NULL OR reqRef.*:ReqHdr.*:ConsumerContext.*:RequesterID = '') THEN
+		THROW USER EXCEPTION MESSAGE
+		2951 VALUES('mandatory_input_missing','RequesterID is missing in Header');
+	END IF;
+	/*IF (CONTAINS(channelIdList,FIELDVALUE(reqRef.*:ReqHdr.*:ConsumerContext.*:RequesterID) )=FALSE)THEN
+		THROW USER EXCEPTION MESSAGE
+		2951 VALUES('Incorrect Input ','RequesterID is missing required value in Header');
+	END IF;*/
+	IF (reqRef.*:ReqHdr.*:ServiceContext.*:ServiceName IS NULL OR reqRef.*:ReqHdr.*:ServiceContext.*:ServiceName ='') THEN
+		THROW USER EXCEPTION MESSAGE
+		2951 VALUES('mandatory_input_missing','ServiceName is missing in Header');
+	ELSEIF (FIELDVALUE(reqRef.*:ReqHdr.*:ServiceContext.*:ServiceName) <>serviceName ) THEN
+		THROW USER EXCEPTION MESSAGE
+		2951 VALUES('Incorrect Input','ServiceName is missing required value in Header');
+	END IF;
+	IF (reqRef.*:ReqHdr.*:ServiceContext.*:ReqRefNum IS NULL OR reqRef.*:ReqHdr.*:ServiceContext.*:ReqRefNum = '') THEN
+		THROW USER EXCEPTION MESSAGE
+		2951 VALUES('mandatory_input_missing','ReqRefNum is missing in Header');
+	END IF;
+	IF (reqRef.*:ReqHdr.*:ServiceContext.*:ServiceVersionNo IS NULL OR reqRef.*:ReqHdr.*:ServiceContext.*:ServiceVersionNo = '') THEN
+		THROW USER EXCEPTION MESSAGE
+		2951 VALUES('mandatory_input_missing','ServiceVersionNo is missing in Header');
+	END IF;
+	
+	DECLARE flag BOOLEAN FALSE;
+	DECLARE PolicyName CHARACTER '{'||serviceName||'Policies}:'||serviceName;
+	DECLARE channelIdList CHAR getPolicyProperty(PolicyName,'channelIdList');
+	CALL tokenSearch(reqRef.*:ReqHdr.*:ConsumerContext.*:RequesterID,channelIdList,'||') INTO flag;
+	IF (flag=FALSE)THEN
+		THROW USER EXCEPTION MESSAGE
+		2951 VALUES('Incorrect Input ','RequesterID is missing required value in Header');
+	END IF;
+	
+END;
+
+CREATE FUNCTION tokenSearch(IN requestId CHARACTER,IN channelIdList CHARACTER, IN Delim CHARACTER ) RETURNS BOOLEAN
+BEGIN
+	DECLARE P INTEGER; 
+    DECLARE Idx INTEGER 1; 
+	DECLARE flag BOOLEAN;
+    DECLARE splitValue CHARACTER NULL; 
+    
+   REPEAT 
+      SET P = POSITION(Delim IN channelIdList); 
+      IF P = 0 THEN 
+         IF(requestId = channelIdList) THEN
+         	SET flag = TRUE;
+         	RETURN flag;
+      	ELSE
+      		SET flag = FALSE;
+         	RETURN flag;
+      	END IF;
+      ELSE 
+         SET splitValue = LEFT(channelIdList, P - 1); 
+         SET channelIdList = SUBSTRING(channelIdList FROM P + LENGTH(Delim)); 
+         IF(requestId = splitValue) THEN
+         	SET flag = TRUE;
+         	RETURN flag;
+   		ELSE
+      		SET Idx = Idx + 1; 
+      	END IF;
+         
+      END IF; 
+   UNTIL P = 0 
+       
+   END REPEAT;    
+END;
+
+CREATE PROCEDURE storePayloadForLogging(IN reqRef REFERENCE,IN envRef REFERENCE,IN nodelist CHAR)
+BEGIN
+	
+	
+--    IF(FIELDNAME(reqRef) ='JSON' OR )THEN
+--	CREATE FIRSTCHILD OF envRef.Variables.Payload DOMAIN(FIELDNAME(reqRef)) ; 
+--	SET envRef.Variables.Payload.JSON.Data= reqRef.Data;
+--	ELSEIF(FIELDNAME(reqRef) ='XMLNSC')THEN
+--	CREATE FIRSTCHILD OF envRef.Variables.Payload DOMAIN(FIELDNAME(reqRef)) ; 
+--	SET envRef.Variables.Payload.XMLNSC= reqRef;
+--	END IF;
+--  CALL MaskDataInOutputRoot(envRef.Variables.Payload,nodelist );
+--	
+END;
+
+
+
+
+--JSON2XML
+
+CREATE FUNCTION JSONTOXMLPROC(In rootNodeJSON REFERENCE, In rootNodeXMLNSC REFERENCE,In namespace NAMESPACE,IN Environment REFERENCE)
+BEGIN
+	
+    DECLARE arrayNodeJSON REFERENCE TO rootNodeJSON;
+	MOVE rootNodeJSON FirstChild;
+	
+	WHILE LASTMOVE(rootNodeJSON) DO
+	IF FIELDTYPE(rootNodeJSON) = JSON.Array THEN
+		SET Environment.name=FIELDNAME(rootNodeJSON);
+	    MOVE arrayNodeJSON  TO rootNodeJSON;
+	    MOVE arrayNodeJSON  FirstChild;
+	
+	    WHILE LASTMOVE( arrayNodeJSON ) DO
+	    CALL JSONTOXMLPROCCreateChildASCopy(arrayNodeJSON,rootNodeXMLNSC,Environment,Environment.name,namespace);
+	    MOVE arrayNodeJSON  NEXTSIBLING; 
+	    END WHILE;
+	ELSE 
+		CALL JSONTOXMLPROCCreateChildASCopy(rootNodeJSON,rootNodeXMLNSC,Environment,null,namespace);
+	
+	END IF;
+	
+	MOVE rootNodeJSON  NEXTSIBLING; 
+	END WHILE;
+	END ;
+
+
+
+CREATE FUNCTION JSONTOXMLPROCCreateChildASCopy(In rootNodeJSON REFERENCE, In rootNodeXMLNSC REFERENCE, IN Environment REFERENCE, IN name CHAR,In namespace CHAR )
+BEGIN
+	 
+	 IF(name IS NULL)THEN
+	 SET name=FIELDNAME(rootNodeJSON);
+	 END IF;
+	    IF(name IN ('ConsumerContext','RequesterID','ServiceContext','ServiceName','OperationName','ReqRefNum','ReqRefTimeStamp','ServiceVersionNo'))THEN
+	 SET namespace = '';
+	 END IF;
+--	 IF(FIELDVALUE(rootNodeJSON)='')THEN
+--		THROW USER EXCEPTION MESSAGE
+--		2951 VALUES('Blank value :',FIELDNAME(rootNodeJSON)||' is empty');
+--	 END IF;
+	
+	 IF(FIELDTYPE( rootNodeJSON)=Name OR FIELDTYPE( rootNodeJSON)=NameValue)THEN
+	 CREATE LASTCHILD OF rootNodeXMLNSC 
+	 AS rootNodeXMLNSC 
+	 TYPE FIELDTYPE( rootNodeJSON)
+	 NAMESPACE namespace 
+	 NAME name
+	 VALUE FIELDVALUE(rootNodeJSON);
+     END IF;
+    
+     CALL JSONTOXMLPROC(rootNodeJSON,rootNodeXMLNSC,namespace,Environment);
+
+	END;
+
+	
+--XML2JSON
+
+CREATE FUNCTION ChangeNamespaceInOutputRoot(In rootNode REFERENCE, In oldNamespace CHARACTER, In newNamespace CHARACTER)
+BEGIN
+	
+	DECLARE CHECKSIBLING BOOLEAN FALSE;
+	--
+	-- DEPTH determines when to finish.  
+	-- Every time we MOVE FIRSTCHILD we add 1 to DEPTH
+	-- Every time we MOVE PARENT we subtract 1 from DEPTH
+	-- MOVE NEXTSIBLING does not change DEPTH
+	-- Initial value is 1, so we are finished when DEPTH = 0
+	--
+	DECLARE DEPTH INTEGER 1;
+	--
+	-- Walk the tree top to bottom, left to right
+	--
+	WHILE DEPTH <> 0 DO 
+		IF CHECKSIBLING = FALSE THEN 
+			MOVE rootNode FirstChild;
+		 	IF LASTMOVE(rootNode) = TRUE THEN
+				SET DEPTH = DEPTH + 1;
+				CALL ChangeNamespace(rootNode, oldNamespace, newNamespace);
+		 	ELSE
+		 		MOVE rootNode NEXTSIBLING;
+			 	IF LASTMOVE(rootNode) = TRUE THEN
+					CALL ChangeNamespace(rootNode, oldNamespace, newNamespace);
+					SET CHECKSIBLING = FALSE;
+			 	ELSE
+					SET DEPTH = DEPTH - 1;
+					Move rootNode PARENT;		 		
+					SET CHECKSIBLING = TRUE;
+				END IF;
+		 	END IF;	
+		ELSE
+			MOVE rootNode NEXTSIBLING;
+		 	IF LASTMOVE(rootNode) = TRUE THEN
+				CALL ChangeNamespace(rootNode, oldNamespace, newNamespace);
+				SET CHECKSIBLING = FALSE;
+		 	ELSE
+				SET DEPTH = DEPTH - 1;
+				Move rootNode PARENT;		 		
+				SET CHECKSIBLING = TRUE;
+			END IF;
+		END IF;
+	END WHILE;
+END;
+
+
+CREATE FUNCTION getExceptionDetail(IN InputExceptionList REFERENCE) RETURNS CHAR
+	BEGIN
+	    DECLARE messageText CHAR;
+	    SET messageText = 'Exception:';
+
+	    DECLARE ptrException reference to InputExceptionList.*[1];
+	
+	    WHILE lastmove(ptrException) DO
+			DECLARE insertCount INT CARDINALITY(ptrException.Insert[]); 
+			DECLARE idx INT 1;
+
+			IF ptrException.Text IS NOT NULL THEN
+				SET messageText = messageText || ' | ' || ptrException.Text;
+			END IF;
+   
+			WHILE idx <= insertCount DO
+				IF ptrException.Insert[idx].Type = '5' THEN
+				  SET messageText = messageText || ' | ' || ptrException.Insert[idx].Text;
+				END IF;
+			
+				SET idx = idx + 1;
+			END WHILE;
+      
+			MOVE ptrException lastchild;
+		END WHILE; 
+	        
+	  	RETURN messageText;
+	END;  
+	
+ CREATE PROCEDURE XML2JSONPROC(IN outRef REFERENCE)BEGIN
+		
+		
+		
+		
+		SET outRef.XMLNSC.(XMLNSC.Element)*[1].*:schemaLocation = NULL;
+		DECLARE I1 INTEGER CARDINALITY(outRef.XMLNSC.(XMLNSC.Element)*[1].(XMLNSC.NamespaceDecl)*[]);
+		DECLARE I2 INTEGER 1;
+		WHILE I2 <= I1 DO
+			SET outRef.XMLNSC.(XMLNSC.Element)*[1].(XMLNSC.NamespaceDecl)*[1] = NULL;
+			SET I2 = I2 + 1;
+		END WHILE;	
+		
+		
+		CREATE LASTCHILD OF outRef DOMAIN 'JSON';
+		Set outRef.JSON.Data = outRef.XMLNSC;
+		CALL createJSONArrays(outRef.JSON.Data);
+		SET  outRef.XMLNSC =NULL;
+		
+	END;
+CREATE FUNCTION CheckArrayElementXpath(IN rootNode REFERENCE, IN env REFERENCE)
+RETURNS BOOLEAN
+BEGIN
+	
+	DECLARE check BOOLEAN false;
+	DECLARE tempRootNode REFERENCE TO rootNode;
+	MOVE env TO env.Split;
+	MOVE env LASTCHILD;
+	
+	
+    IF (FIELDVALUE(env) = FIELDNAME(rootNode) )  THEN
+    	
+    	MOVE env PREVIOUSSIBLING;
+    	
+		SET  check =true;
+	Loop1:	WHILE (LASTMOVE(env))DO
+		
+		MOVE tempRootNode PARENT ;
+		
+		IF(NOT(FIELDNAME(tempRootNode)= FIELDVALUE(env)))THEN
+		set check =false;
+		LEAVE Loop1;
+		
+		END IF;
+		MOVE env PREVIOUSSIBLING;
+		
+		END WHILE;
+			
+		
+		END IF;
+		
+		RETURN check;
+    
+END;
+CREATE FUNCTION ChangeNamespace(IN rootNode REFERENCE, In oldNamespace CHARACTER, In newNamespace CHARACTER)
+BEGIN
+	--
+	-- Check for elements/attributes with the source namespace		
+	--
+    IF (FIELDTYPE(rootNode) = Name) OR (FIELDTYPE(rootNode) = NameValue) THEN
+		IF FIELDNAMESPACE(rootNode) IS NOT NULL  THEN 
+			--
+			-- Set the new target namespace
+			--
+			--SET rootNode NAMESPACE = newNamespace;
+			--
+			-- Get rid of any inline namespace definitions
+			--
+			SET rootNode.(XMLNSC.NamespaceDecl)* = NULL;
+		END IF;
+    END IF;
+END;
+	-- Walk the tree recursively starting at inRef. 
+	-- Replace all sequences of same-named elements with a JSON array.
+	-- A JSON array has a name and some child elements with values. 
+	-- The array element must have field type JSON.Array.
+	-- The child elements that hold the values can optionally have names. 
+	CREATE PROCEDURE createJSONArrays(IN root REFERENCE ) 
+	BEGIN
+		-- track the start and end of 'arrays' ( sequences of same-named siblings )
+		DECLARE firstArrayElementRef REFERENCE TO root;
+		DECLARE siblingRef REFERENCE TO root;
+		DECLARE arraySize INTEGER 0;
+
+		WHILE LASTMOVE(siblingRef) DO
+			
+			-- Process any child elements first 
+			DECLARE firstChildRef REFERENCE TO siblingRef;
+			MOVE firstChildRef FIRSTCHILD;
+			IF LASTMOVE(firstChildRef) THEN
+				CALL createJSONArrays(firstChildRef);
+			END IF;
+
+			-- IF this sibling's name is different from the previous one.
+			IF FIELDNAME(siblingRef) = FIELDNAME(firstArrayElementRef) THEN
+				SET arraySize = arraySize + 1;
+			ELSE
+				-- IF there was a sequence of two or more siblings with the same name
+				IF arraySize > 1 THEN
+					CALL createJSONArray(firstArrayElementRef, arraySize);
+				END IF;				
+
+				-- start scanning for a new array
+				MOVE firstArrayElementRef TO siblingRef;
+				SET arraySize = 1;
+			END IF;
+			
+			MOVE siblingRef NEXTSIBLING;
+		END WHILE;
+		
+		IF arraySize > 1 THEN
+			CALL createJSONArray(firstArrayElementRef, arraySize);
+		END IF;
+	END;
+
+	CREATE PROCEDURE createJSONArray(IN firstArrayElementRef REFERENCE, IN arraySize INTEGER) BEGIN
+		-- Create a parent element for the array
+		DECLARE arrayParentRef REFERENCE TO firstArrayElementRef;
+		CREATE PREVIOUSSIBLING OF firstArrayElementRef 
+			AS arrayParentRef 
+			TYPE JSON.Array 
+			NAMESPACE FIELDNAMESPACE(firstArrayElementRef) 
+			NAME FIELDNAME(firstArrayElementRef);
+			
+		-- Make the array members children of the new parent element
+		DECLARE pos INTEGER 1;
+		WHILE pos <= arraySize DO
+			DECLARE tempRef REFERENCE TO firstArrayElementRef;
+			-- advance the reference. This should never fail because we have
+			-- already walked all of these siblings to discover the array.
+			MOVE firstArrayElementRef NEXTSIBLING;
+
+			DETACH tempRef;
+			ATTACH tempRef TO arrayParentRef AS LASTCHILD;
+			
+			SET pos = pos + 1;
+		END WHILE;
+	END;
+
+ CREATE PROCEDURE XML2JSONXPATHPROC(IN outRef REFERENCE,IN envRef REFERENCE )BEGIN
+	    SET outRef.XMLNSC.(XMLNSC.Element)*[1].*:schemaLocation = NULL;
+		DECLARE I1 INTEGER CARDINALITY(outRef.XMLNSC.(XMLNSC.Element)*[1].(XMLNSC.NamespaceDecl)*[]);
+		DECLARE I2 INTEGER 1;
+		WHILE I2 <= I1 DO
+			SET outRef.XMLNSC.(XMLNSC.Element)*[1].(XMLNSC.NamespaceDecl)*[1] = NULL;
+			SET I2 = I2 + 1;
+		END WHILE;	
+		
+	
+     	CREATE LASTCHILD OF outRef DOMAIN 'JSON';
+		Set outRef.JSON.Data = outRef.XMLNSC;
+	
+		
+		
+		CALL createJSONArraysXPATH(outRef.JSON.Data,envRef);
+		CALL RemoveNullObjectInJson(outRef.JSON.Data);
+		SET  outRef.XMLNSC =NULL;
+		
+	END;
+
+CREATE PROCEDURE createJSONArraysXPATH(IN root REFERENCE ,IN env REFERENCE) 
+	BEGIN
+		
+		DECLARE firstArrayElementRef REFERENCE TO root;
+	
+		DECLARE arraySize INTEGER 0;
+		
+		DECLARE  test BOOLEAN false;
+    	
+		DECLARE outRef REFERENCE to env.VariablesXpath.Array[1];
+		WHILE LASTMOVE(outRef)DO
+		
+		call Split(outRef,env,'.');
+		
+		DECLARE Ref REFERENCE to env.Split.Array[1];
+		
+
+		
+		
+DECLARE CHECKSIBLING BOOLEAN FALSE;
+	DECLARE CHECK BOOLEAN FALSE;
+	--
+	-- DEPTH determines when to finish.  
+	-- Every time we MOVE FIRSTCHILD we add 1 to DEPTH
+	-- Every time we MOVE PARENT we subtract 1 from DEPTH
+	-- MOVE NEXTSIBLING does not change DEPTH
+	-- Initial value is 1, so we are finished when DEPTH = 0
+	--
+	DECLARE DEPTH INTEGER 1;
+	--
+	-- Walk the tree top to bottom, left to right
+	--
+	LOOP1:WHILE DEPTH <> 0 DO 
+		IF CHECKSIBLING = FALSE THEN 
+			MOVE firstArrayElementRef FirstChild;
+		 	IF LASTMOVE(firstArrayElementRef) = TRUE  THEN
+				SET DEPTH = DEPTH + 1;
+				SET CHECK =CheckArrayElementXpath(firstArrayElementRef,env);
+				IF( CHECK)THEN
+					CALL createJSONARRAYFROMXPATH(firstArrayElementRef,CHECK,arraySize);
+					SET DEPTH = DEPTH + 1;
+		 		END IF;
+		 	ELSE
+		 		MOVE firstArrayElementRef NEXTSIBLING;
+				IF LASTMOVE(firstArrayElementRef) = TRUE  THEN
+					SET CHECK =CheckArrayElementXpath(firstArrayElementRef,env);
+					IF( CHECK)THEN
+						CALL createJSONARRAYFROMXPATH(firstArrayElementRef,CHECK,arraySize);
+						SET DEPTH = DEPTH + 1;
+			 		END IF;
+					SET CHECKSIBLING = FALSE;
+			 	ELSE
+					SET DEPTH = DEPTH - 1;
+					Move firstArrayElementRef PARENT;		 		
+					SET CHECKSIBLING = TRUE;
+				END IF;
+		 	END IF;	
+		ELSE
+			MOVE firstArrayElementRef NEXTSIBLING;
+		 		IF LASTMOVE(firstArrayElementRef) = TRUE  THEN
+		 			SET CHECK =CheckArrayElementXpath(firstArrayElementRef,env);
+					IF( CHECK)THEN
+						CALL createJSONARRAYFROMXPATH(firstArrayElementRef,CHECK,arraySize);
+						SET DEPTH = DEPTH + 1;
+		 			END IF;
+					SET CHECKSIBLING = FALSE;
+		 		ELSE
+					SET DEPTH = DEPTH - 1;
+					Move firstArrayElementRef PARENT;		 		
+					SET CHECKSIBLING = TRUE;
+				END IF;
+		END IF;
+	END WHILE;
+	
+
+		
+		SET arraySize=0;
+		MOVE firstArrayElementRef TO root;
+		MOVE outRef  NEXTSIBLING; 
+		END WHILE; 
+	
+	END;
+	
+	
+	------FUNCTION TO TRAVERSE THE COMPLETE JSON STRUCTURE TO REMOVE JSON NULL OBJECT
+	
+	
+	CREATE PROCEDURE createJSONARRAYFROMXPATH ( INOUT rootNode REFERENCE ,IN CHECK BOOLEAN , IN  arraySize INTEGER )
+	BEGIN
+			
+			
+		--	WHILE LASTMOVE(rootNode )and CHECK DO
+		
+		DECLARE tempcountRef REFERENCE TO rootNode;
+		
+	    DECLARE arrayElementName CHAR FIELDNAME(rootNode);
+		WHILE LASTMOVE(tempcountRef) DO
+			
+		
+		
+		IF(FIELDNAME(tempcountRef) = FIELDNAME(rootNode))THEN
+		SET arraySize =arraySize+ 1;
+		END IF;
+		MOVE tempcountRef NEXTSIBLING;
+		END WHILE;
+		
+        CALL createJSONArray(rootNode, arraySize);
+	    SET arraySize=0;
+--	    MOVE rootNode PARENT;
+--	   
+--	   WHILE(FIELDNAME(rootNode)=arrayElementName) DO
+--	    MOVE rootNode PARENT;
+--		END WHILE;
+--	    MOVE rootNode NEXTSIBLING;
+--	    
+--	 IF(LASTMOVE (rootNode))THEN
+--	   MOVE rootNode TO rootNode.*:{arrayElementName};
+--	  
+--	 END IF;
+	    
+	    
+	  --  END WHILE;
+	END;
+	
+	CREATE FUNCTION RemoveNullObjectInJson(In rootNode REFERENCE)
+BEGIN
+	
+	DECLARE CHECKSIBLING BOOLEAN FALSE;
+	--
+	-- DEPTH determines when to finish.  
+	-- Every time we MOVE FIRSTCHILD we add 1 to DEPTH
+	-- Every time we MOVE PARENT we subtract 1 from DEPTH
+	-- MOVE NEXTSIBLING does not change DEPTH
+	-- Initial value is 1, so we are finished when DEPTH = 0
+	--
+	DECLARE DEPTH INTEGER 1;
+	--
+	-- Walk the tree top to bottom, left to right
+	--
+	WHILE DEPTH <> 0 DO 
+		IF CHECKSIBLING = FALSE THEN 
+			MOVE rootNode FirstChild;
+		 	IF LASTMOVE(rootNode) = TRUE THEN
+				SET DEPTH = DEPTH + 1;
+				CALL SetBlankValue(rootNode);
+		 	ELSE
+		 		MOVE rootNode NEXTSIBLING;
+			 	IF LASTMOVE(rootNode) = TRUE THEN
+					CALL SetBlankValue(rootNode);
+					SET CHECKSIBLING = FALSE;
+			 	ELSE
+					SET DEPTH = DEPTH - 1;
+					Move rootNode PARENT;		 		
+					SET CHECKSIBLING = TRUE;
+				END IF;
+		 	END IF;	
+		ELSE
+			MOVE rootNode NEXTSIBLING;
+		 	IF LASTMOVE(rootNode) = TRUE THEN
+				CALL SetBlankValue(rootNode);
+				SET CHECKSIBLING = FALSE;
+		 	ELSE
+				SET DEPTH = DEPTH - 1;
+				Move rootNode PARENT;		 		
+				SET CHECKSIBLING = TRUE;
+			END IF;
+		END IF;
+	END WHILE;
+END;
+	
+	
+-- Function to set  blank string to null objects in JSON
+	
+	CREATE FUNCTION SetBlankValue(IN rootNode REFERENCE)
+	
+     BEGIN
+	
+	IF (FIELDTYPE(rootNode) = JSON.Object ) THEN
+		DECLARE tempref REFERENCE TO rootNode;
+		MOVE tempref FIRSTCHILD;
+		IF(NOT(LASTMOVE(tempref)))THEN
+		SET tempref= '';
+        END IF;
+	END IF;
+    
+    END;
+	CREATE PROCEDURE Split (IN S CHARACTER, IN Env REFERENCE, IN Delim CHARACTER) 
+    BEGIN 
+   DECLARE P INTEGER; 
+   DECLARE Idx INTEGER 1; 
+
+   SET Env.Split = NULL; 
+    
+   REPEAT 
+      SET P = POSITION(Delim IN S); 
+      IF P = 0 THEN 
+         SET Env.Split.Array[Idx] = S; 
+      ELSE 
+         SET Env.Split.Array[Idx] = LEFT(S, P - 1); 
+         SET S = SUBSTRING(S FROM P + LENGTH(Delim)); 
+         SET Idx = Idx + 1; 
+      END IF; 
+   UNTIL P = 0 
+       
+   END REPEAT;    
+
+END; 

@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?><xsd:schema attributeFormDefault="unqualified" elementFormDefault="qualified" targetNamespace="http://xmlns.yesbank.com/WS/UPIService" xmlns:cdt="http://xmlns.yesbank.com/WS/CommonTypes" xmlns:ibmSchExtn="http://www.ibm.com/schema/extensions" xmlns:txp="http://xmlns.yesbank.com/WS/UPIService" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<xsd:import namespace="http://xmlns.yesbank.com/WS/CommonTypes" schemaLocation="../CommonSchema/commontypes.xsd"/>
+	<xsd:simpleType name="AccountNumberType">
+		<xsd:restriction base="xsd:string">
+			<xsd:maxLength value="16"/>
+			<xsd:pattern value="[a-zA-Z0-9][\s\S]*"/>
+		</xsd:restriction>
+	</xsd:simpleType>
+
+	<xsd:element ibmSchExtn:docRoot="true" name="GetAccountListRes" type="txp:GetAccountListServiceResType"/>
+
+	<xsd:element ibmSchExtn:docRoot="true" name="GetAccountListReq" type="txp:GetAccountListServiceReqType"/>
+
+	<xsd:complexType name="GetCustomerIdListReqBodyType">
+		<xsd:sequence>
+			<xsd:element name="MobileNumber" type="txp:MobileNumberType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:simpleType name="MobileNumberType">
+		<xsd:restriction base="xsd:string">
+			<xsd:length value="10"/>
+			<xsd:pattern value="[0-9]+"/>
+		</xsd:restriction>
+	</xsd:simpleType>
+
+	<xsd:complexType name="GetCustomerIdListResBodyType">
+		<xsd:sequence>
+			<xsd:element maxOccurs="unbounded" minOccurs="0" name="CustomerId" type="cdt:CustomerIdType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="GetCustomerIdListServiceReqType">
+		<xsd:sequence>
+			<xsd:element name="ReqHdr" type="cdt:ReqHdrType"/>
+			<xsd:element name="ReqBody" type="txp:GetCustomerIdListReqBodyType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="GetCustomerIdListServiceResType">
+		<xsd:sequence>
+			<xsd:element name="ResHdr" type="cdt:ResHdrType"/>
+			<xsd:element maxOccurs="1" minOccurs="0" name="ResBody" type="txp:GetCustomerIdListResBodyType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="GetAccountListReqBodyType">
+		<xsd:sequence>
+			<xsd:element maxOccurs="unbounded" minOccurs="1" name="CustomerId" type="cdt:CustomerIdType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="GetAccountListResBodyType">
+		<xsd:sequence>
+			<xsd:element maxOccurs="unbounded" minOccurs="0" name="AcoountDetails" type="txp:AcoountDetailsType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="AcoountDetailsType">
+		<xsd:sequence>
+			<xsd:element maxOccurs="1" minOccurs="0" name="CustomerID" type="cdt:CustomerIdType"/>
+			<xsd:element maxOccurs="unbounded" minOccurs="0" name="AccountNumberDtls" type="txp:AccountNumberDtlsType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="AccountNumberDtlsType">
+		<xsd:sequence>
+			<xsd:element maxOccurs="1" minOccurs="0" name="AccountNumber" type="txp:AccountNumberType">
+			</xsd:element>
+			<xsd:element maxOccurs="1" minOccurs="0" name="CustomerAccountRealtionship" type="xsd:string"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="SetORValidateMPINReqBodyType">
+		<xsd:sequence>
+			<xsd:element name="CustomerId" type="cdt:CustomerIdType"/>
+			<xsd:element name="MPIN" type="xsd:string"/>
+			<xsd:element name="RequestType" type="txp:RequestTypeType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="GetExpiryDateReqBodyType">
+		<xsd:sequence>
+			<xsd:element name="DebitCardNumber" type="cdt:CardNumberType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="GetExpiryDateResBodyType">
+		<xsd:sequence>
+			<xsd:element maxOccurs="1" minOccurs="0" name="ExpiryDate" type="xsd:date"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:simpleType name="RequestTypeType">
+		<xsd:restriction base="xsd:string">
+			<xsd:enumeration value="Validate"/>
+			<xsd:enumeration value="Generate"/>
+		</xsd:restriction>
+	</xsd:simpleType>
+	<xsd:complexType name="GetExpiryDateServiceReqType">
+		<xsd:sequence>
+			<xsd:element name="ReqHdr" type="cdt:ReqHdrType"/>
+			<xsd:element name="ReqBody" type="txp:GetExpiryDateReqBodyType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="GetExpiryDateServiceResType">
+		<xsd:sequence>
+			<xsd:element name="ResHdr" type="cdt:ResHdrType"/>
+			<xsd:element maxOccurs="1" minOccurs="0" name="ResBody" type="txp:GetExpiryDateResBodyType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:element ibmSchExtn:docRoot="true" name="GetExpiryDateReq" type="txp:GetExpiryDateServiceReqType"/>
+
+	<xsd:element ibmSchExtn:docRoot="true" name="GetExpiryDateRes" type="txp:GetExpiryDateServiceResType"/>
+	<xsd:complexType name="GetAccountListServiceReqType">
+		<xsd:sequence>
+			<xsd:element name="ReqHdr" type="cdt:ReqHdrType"/>
+			<xsd:element name="ReqBody" type="txp:GetAccountListReqBodyType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="GetAccountListServiceResType">
+		<xsd:sequence>
+			<xsd:element name="ResHdr" type="cdt:ResHdrType"/>
+			<xsd:element maxOccurs="1" minOccurs="0" name="ResBody" type="txp:GetAccountListResBodyType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="SetORValidateMPINServiceReqType">
+		<xsd:sequence>
+			<xsd:element name="ReqHdr" type="cdt:ReqHdrType"/>
+			<xsd:element name="ReqBody" type="txp:SetORValidateMPINReqBodyType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="SetORValidateMPINServiceResType">
+		<xsd:sequence>
+			<xsd:element name="ResHdr" type="cdt:ResHdrType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:element ibmSchExtn:docRoot="true" name="GetCustomerIdListReq" type="txp:GetCustomerIdListServiceReqType"/>
+
+	<xsd:element ibmSchExtn:docRoot="true" name="GetCustomerIdListRes" type="txp:GetCustomerIdListServiceResType"/>
+
+	<xsd:element ibmSchExtn:docRoot="true" name="SetORValidateMPINReq" type="txp:SetORValidateMPINServiceReqType"/>
+
+	<xsd:element ibmSchExtn:docRoot="true" name="SetORValidateMPINRes" type="txp:SetORValidateMPINServiceResType"/>
+
+	<xsd:complexType name="GetHashKeyReqBodyType">
+		<xsd:sequence>
+			<xsd:element name="CustomerId" type="cdt:CustomerIdType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="GetHashKeyResBodyType">
+		<xsd:sequence>
+			<xsd:element maxOccurs="1" minOccurs="0" name="Key" type="xsd:string"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="GetHashKeyServiceReqType">
+		<xsd:sequence>
+			<xsd:element name="ReqHdr" type="cdt:ReqHdrType"/>
+			<xsd:element name="ReqBody" type="txp:GetHashKeyReqBodyType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="GetHashKeyServiceResType">
+		<xsd:sequence>
+			<xsd:element name="ResHdr" type="cdt:ResHdrType"/>
+			<xsd:element maxOccurs="1" minOccurs="0" name="ResBody" type="txp:GetHashKeyResBodyType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:element ibmSchExtn:docRoot="true" name="GetHashKeyReq" type="txp:GetHashKeyServiceReqType"/>
+
+	<xsd:element ibmSchExtn:docRoot="true" name="GetHashKeyRes" type="txp:GetHashKeyServiceResType"/>
+
+	<xsd:simpleType name="AadhaarNumberType">
+		<xsd:restriction base="xsd:string">
+			<xsd:length value="12"/>
+			<xsd:pattern value="[0-9]+"/>
+		</xsd:restriction>
+	</xsd:simpleType>
+
+	<xsd:complexType name="GetLatestAadhaarLinkedAccReqBodyType">
+		<xsd:sequence>
+			<xsd:element maxOccurs="1" minOccurs="1" name="AadhaarNumber" type="txp:AadhaarNumberType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="GetLatestAadhaarLinkedAccResBodyType">
+		<xsd:sequence>
+			<xsd:element maxOccurs="1" minOccurs="0" name="CustomerID" type="cdt:CustomerIdType"/>
+			<xsd:element maxOccurs="1" minOccurs="0" name="AadhaarNumber" type="txp:AadhaarNumberType"/>
+			<xsd:element maxOccurs="1" minOccurs="0" name="AccountNumber" type="cdt:AccountNumberType"/>
+			<xsd:element maxOccurs="1" minOccurs="0" name="IFSC" type="cdt:IFSCCodeType"/>    		
+    	
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="GetLatestAadhaarLinkedAccReqType">
+		<xsd:sequence>
+			<xsd:element name="ReqHdr" type="cdt:ReqHdrType"/>
+			<xsd:element name="ReqBody" type="txp:GetLatestAadhaarLinkedAccReqBodyType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="GetLatestAadhaarLinkedAccResType">
+		<xsd:sequence>
+			<xsd:element name="ResHdr" type="cdt:ResHdrType"/>
+			<xsd:element maxOccurs="1" minOccurs="0" name="ResBody" type="txp:GetLatestAadhaarLinkedAccResBodyType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:element ibmSchExtn:docRoot="true" name="GetLatestAadhaarLinkedAccReq" type="txp:GetLatestAadhaarLinkedAccReqType"/>
+
+	<xsd:element ibmSchExtn:docRoot="true" name="GetLatestAadhaarLinkedAccRes" type="txp:GetLatestAadhaarLinkedAccResType"/>
+	
+	<xsd:complexType name="GetFundsTransferStatusResBodyType">
+		<xsd:sequence>
+		
+			<xsd:element maxOccurs="1" minOccurs="1" name="TransactionId">
+				<xsd:annotation>
+					<xsd:documentation>Unique Transaction Id for Funds Transfer.</xsd:documentation>
+				</xsd:annotation>
+				<xsd:simpleType>
+					<xsd:restriction base="xsd:string">
+						<xsd:pattern value="[a-zA-Z0-9]*"/>
+					</xsd:restriction>
+				</xsd:simpleType>
+			</xsd:element>
+			
+			<xsd:element maxOccurs="1" minOccurs="1" name="FCRTransactionId">
+				<xsd:annotation>
+					<xsd:documentation>Unique FCR Transaction Id for Funds Transfer.</xsd:documentation>
+				</xsd:annotation>
+				<xsd:simpleType>
+					<xsd:restriction base="xsd:string">
+						<xsd:pattern value="[a-zA-Z0-9]*"/>
+					</xsd:restriction>
+				</xsd:simpleType>
+			</xsd:element>
+			
+		</xsd:sequence>
+	</xsd:complexType>
+	
+	<xsd:complexType name="GetFundsTransferStatusReqBodyType">
+		<xsd:sequence>
+		
+			<xsd:element maxOccurs="1" minOccurs="1" name="TransactionId">
+				<xsd:annotation>
+					<xsd:documentation>Unique Transaction Id for Funds Transfer.</xsd:documentation>
+				</xsd:annotation>
+				<xsd:simpleType>
+					<xsd:restriction base="xsd:string">
+						<xsd:pattern value="[a-zA-Z0-9]*"/>
+					</xsd:restriction>
+				</xsd:simpleType>
+			</xsd:element>
+			
+			<xsd:element maxOccurs="1" minOccurs="1" name="ChannelId">
+				<xsd:annotation>
+					<xsd:documentation>Channel Id for Funds Transfer.</xsd:documentation>
+				</xsd:annotation>
+				<xsd:simpleType>
+					<xsd:restriction base="xsd:string">
+						<xsd:pattern value="[a-zA-Z0-9]*"/>
+					</xsd:restriction>
+				</xsd:simpleType>
+			</xsd:element>
+			
+			<xsd:element maxOccurs="1" minOccurs="1" name="UserId">
+				<xsd:annotation>
+					<xsd:documentation>User Id.</xsd:documentation>
+				</xsd:annotation>
+				<xsd:simpleType>
+					<xsd:restriction base="xsd:string">
+						<xsd:pattern value="[a-zA-Z0-9]*"/>
+					</xsd:restriction>
+				</xsd:simpleType>
+			</xsd:element>
+			
+		</xsd:sequence>
+	</xsd:complexType>
+	
+	
+	<xsd:complexType name="GetFundsTransferStatusReqType">
+		<xsd:sequence>
+			<xsd:element maxOccurs="1" minOccurs="1" name="ReqHdr" type="cdt:ReqHdrType"/>
+			<xsd:element maxOccurs="1" minOccurs="0" name="ReqBody" type="txp:GetFundsTransferStatusReqBodyType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:complexType name="GetFundsTransferStatusResType">
+		<xsd:sequence>
+			<xsd:element maxOccurs="1" minOccurs="1" name="ResHdr" type="cdt:ResHdrType"/>
+			<xsd:element maxOccurs="1" minOccurs="0" name="ResBody" type="txp:GetFundsTransferStatusResBodyType"/>
+		</xsd:sequence>
+	</xsd:complexType>
+
+	<xsd:element ibmSchExtn:docRoot="true" name="GetFundsTransferStatusReq" type="txp:GetFundsTransferStatusReqType"/>
+
+	<xsd:element ibmSchExtn:docRoot="true" name="GetFundsTransferStatusRes" type="txp:GetFundsTransferStatusResType"/>
+	
+</xsd:schema>

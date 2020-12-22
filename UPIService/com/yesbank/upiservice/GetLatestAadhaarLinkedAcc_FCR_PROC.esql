@@ -1,0 +1,112 @@
+BROKER SCHEMA com.yesbank.upiservice
+PATH com.yesbank.esb;
+DECLARE schemaFCR EXTERNAL CHARACTER '';
+
+CREATE COMPUTE MODULE GetLatestAadhaarLinkedAcc_FCR_PROC
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		
+		DECLARE adhharNo CHARACTER;
+		SET adhharNo = InputRoot.XMLNSC.*:GetLatestAadhaarLinkedAccReq.*:ReqBody.*:AadhaarNumber;
+		
+		DECLARE RESULTS,Logging_Query CHARACTER;
+		DECLARE count INTEGER;
+		
+		SET Logging_Query	= 'CALL PROC_AADHAARDETAILS('||adhharNo||')';
+		
+		--AUDIT_LOGGING
+		 --CALL AuditMessage(CAST(Logging_Query AS BLOB CCSID 1208),'BackendRequest:FCR PROC',Environment,2);
+		  --AUDIT_LOGGING
+        		SET  Environment.Variables.LogMessage  			= CAST(Logging_Query AS BLOB CCSID 1208);
+		        SET  Environment.Variables.MessageFlowName 		= SQL.MessageFlowLabel;
+			    SET  Environment.Variables.LogPoint 			= 'BackendRequest:FCR PROC';		   
+			    SET Environment.LOGMESSAGE.LOG_LEVEL            = 2;
+			   PROPAGATE TO TERMINAL 'out2' DELETE NONE;
+		
+		 CALL PROC_AADHAARDETAILS(adhharNo,Environment.Variables.AadhaarLinkedDtls[]) IN Database.{schemaFCR};
+		 --SET count = CARDINALITY(Environment.Variables.AadhaarLinkedDtls[]);
+		
+		 IF CAST(CAST(Environment.Variables.AadhaarLinkedDtls.COD_CUST_ID AS INTEGER) AS CHARACTER) <> '0' THEN
+		   	SET Logging_Query	=  'CUSTOMERID = '||CAST(CAST(Environment.Variables.AadhaarLinkedDtls.COD_CUST_ID AS INTEGER) AS CHARACTER)||','
+		   							||'AADHAARNO = '||CAST(CAST(Environment.Variables.AadhaarLinkedDtls.COD_AADHAAR_NO AS INTEGER) AS CHARACTER)||','
+		   							||'IFSC = '||CAST(Environment.Variables.AadhaarLinkedDtls.IFSC as CHARACTER)||','
+		   							||'ACCOUNTNO = '||CAST(Environment.Variables.AadhaarLinkedDtls.COD_ACCT_NO as CHARACTER)||'';
+		   ELSE 
+		   	SET Logging_Query = 'No Data Found';
+		   END IF;
+		   
+		     CREATE LASTCHILD OF Environment.Variable DOMAIN ('XMLNSC') NAME 'XMLNSC';
+  			SET Environment.Variable.XMLNSC.AadhaarLinkedDtls[] =Environment.Variables.AadhaarLinkedDtls[];
+		   
+		   --AUDIT_LOGGING
+		 CALL AuditMessage(Environment.Variable.*[<],'BackendResponse:FCR PROC',Environment,2);
+		   
+		    
+		 --Response Headrer construction
+		 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResHdr.ConsumerContext.RequesterID		 		= Environment.Variables.ChannelId;
+		 		 
+		 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResHdr.ServiceContext.ServiceName 				= Environment.Variables.ServiceName;
+		 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResHdr.ServiceContext.ReqRefNum 				= Environment.Variables.TxnRefNo;
+		 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResHdr.ServiceContext.ReqRefTimeStamp 			= Environment.Variables.TxnDateTime;
+		 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResHdr.ServiceContext.ServiceVersionNo 			= Environment.Variables.ServiceVersionNo;
+		 
+		 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResHdr.ServiceResponse.EsbResTimeStamp			= CURRENT_TIMESTAMP;
+		 
+		 IF CAST(CAST(Environment.Variables.AadhaarLinkedDtls.COD_CUST_ID AS INTEGER) AS CHARACTER) <> '0' THEN
+		 	 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResHdr.ServiceResponse.EsbResStatus			= '0';
+		 
+			 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResBody.namespace:CustomerID						= CAST(CAST(Environment.Variables.AadhaarLinkedDtls.COD_CUST_ID AS INTEGER) AS CHARACTER);
+			 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResBody.namespace:AadhaarNumber						= CAST(CAST(Environment.Variables.AadhaarLinkedDtls.COD_AADHAAR_NO AS INTEGER) AS CHARACTER);
+			 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResBody.namespace:AccountNumber 					= Environment.Variables.AadhaarLinkedDtls.COD_ACCT_NO;
+			 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResBody.namespace:IFSC 								= Environment.Variables.AadhaarLinkedDtls.IFSC;
+		 ELSE
+			 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResHdr.ServiceResponse.EsbResStatus				= '3';
+			 
+			 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResHdr.ErrorDetails.ErrorInfo.ErrSrc 			= 'FCR';
+			 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResHdr.ErrorDetails.ErrorInfo.EsbErrShortDesc 	= 'NO DATA FOUND';
+			 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResHdr.ErrorDetails.ErrorInfo.HostErrCode	 	= 'NA';
+			 SET OutputRoot.XMLNSC.namespace:GetLatestAadhaarLinkedAccRes.namespace:ResHdr.ErrorDetails.ErrorInfo.HostErrDesc 		= 'NA';
+		 END IF;
+		
+		
+	
+		IF(Environment.Variables.JSONMessage = true)THEN
+		SET Environment.VariablesXpath.Array[1]= COALESCE(Environment.Variables.Operation.Name,'')||'Res.ResHdr.ErrorDetails';
+		
+		CALL XML2JSONXPATHPROC(OutputRoot,Environment);
+	    	   
+	    SET OutputLocalEnvironment.Destination.HTTP.RequestIdentifier= CAST(Environment.Variables.RequestIdentifier AS BLOB);
+	    
+	    --AUDIT AND LOGGING
+	    CALL AuditMessage(OutputRoot,'ESBResponseSent',Environment,2);
+	    PROPAGATE TO TERMINAL 'out1';
+	   
+	    RETURN FALSE;
+	    END IF;
+		
+      	SET OutputLocalEnvironment.Destination.SOAP.Reply.ReplyIdentifier=CAST(Environment.Variables.RequestIdentifier AS BLOB);
+		
+		--AUDIT AND LOGGING
+		CALL AuditMessage(OutputRoot,'ESBResponseSent',Environment,2);
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+	
+	CREATE PROCEDURE  PROC_AADHAARDETAILS(IN AADHAAR_NO CHARACTER )
+	LANGUAGE DATABASE
+	DYNAMIC RESULT SETS 1
+	EXTERNAL NAME "PROC_AADHAARDETAILS";
+END MODULE;

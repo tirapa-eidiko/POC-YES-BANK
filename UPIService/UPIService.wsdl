@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?><wsdl:definitions name="UPIService" targetNamespace="http://xmlns.yesbank.com/WS/UPIService" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:tns="http://xmlns.yesbank.com/WS/UPIService" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <wsdl:documentation>
+    <wsdl:appinfo source="WMQI_APPINFO">
+      <MRWSDLAppInfo imported="true">
+        <generatedXSD location="UPIService_InlineSchema2.xsd"/>
+        <binding hasEncoding="false" imported="true" name="UPIServiceSoapHttpBindings" originalBindingStyle="document"/>
+      </MRWSDLAppInfo>
+    </wsdl:appinfo>
+  </wsdl:documentation>
+	
+	<wsdl:types>
+		
+
+		
+        	<xsd:schema targetNamespace="http://xmlns.yesbank.com/WS/UPIService">
+<xsd:include schemaLocation="UPIService_InlineSchema2.xsd"/>
+    </xsd:schema>
+        <xsd:schema>
+<xsd:import namespace="http://xmlns.yesbank.com/WS/UPIService" schemaLocation="UPIService/UPIService.xsd"/>
+</xsd:schema>
+    </wsdl:types>
+
+	<wsdl:message name="GetCustomerIdListRequest">
+		<wsdl:part element="tns:GetCustomerIdListReq" name="GetCustomerIdListServiceReq"/>
+	</wsdl:message>
+	<wsdl:message name="GetCustomerIdListResponse">
+		<wsdl:part element="tns:GetCustomerIdListRes" name="GetCustomerIdListServiceRes"/>
+	</wsdl:message>
+
+	<wsdl:message name="GetAccountListRequest">
+		<wsdl:part element="tns:GetAccountListReq" name="GetAccountListServiceReq"/>
+	</wsdl:message>
+	<wsdl:message name="GetAccountListResponse">
+		<wsdl:part element="tns:GetAccountListRes" name="GetAccountListServiceRes"/>
+	</wsdl:message>
+	<wsdl:message name="SetORValidateMPINRequest">
+		<wsdl:part element="tns:SetORValidateMPINReq" name="SetORValidateMPINServiceReq"/>
+	</wsdl:message>
+	<wsdl:message name="SetORValidateMPINResponse">
+		<wsdl:part element="tns:SetORValidateMPINRes" name="SetORValidateMPINServiceRes"/>
+	</wsdl:message>
+	<wsdl:message name="GetExpiryDateRequest">
+		<wsdl:part element="tns:GetExpiryDateReq" name="GetExpiryDateServiceReq"/>
+	</wsdl:message>
+	<wsdl:message name="GetExpiryDateResponse">
+		<wsdl:part element="tns:GetExpiryDateRes" name="GetExpiryDateServiceRes"/>
+	</wsdl:message>
+	<wsdl:message name="GetHashKeyRequest">
+		<wsdl:part element="tns:GetHashKeyReq" name="GetHashKeyServiceReq"/>
+	</wsdl:message>
+	<wsdl:message name="GetHashKeyResponse">
+		<wsdl:part element="tns:GetHashKeyRes" name="GetHashKeyServiceRes"/>
+	</wsdl:message>
+	<wsdl:message name="GetLatestAadhaarLinkedAccRequest">
+		<wsdl:part element="tns:GetLatestAadhaarLinkedAccReq" name="GetLatestAadhaarLinkedAccReq"/>
+	</wsdl:message>
+	<wsdl:message name="GetLatestAadhaarLinkedAccResponse">
+		<wsdl:part element="tns:GetLatestAadhaarLinkedAccRes" name="GetLatestAadhaarLinkedAccRes"/>
+	</wsdl:message>
+	<wsdl:message name="GetFundsTransferStatusRequest">
+		<wsdl:part element="tns:GetFundsTransferStatusReq" name="GetFundsTransferStatusReq"/>
+	</wsdl:message>
+	<wsdl:message name="GetFundsTransferStatusResponse">
+		<wsdl:part element="tns:GetFundsTransferStatusRes" name="GetFundsTransferStatusRes"/>
+	</wsdl:message>
+
+	<wsdl:portType name="UPIService">
+
+		<wsdl:operation name="GetCustomerIdList">
+			<wsdl:input message="tns:GetCustomerIdListRequest"/>
+			<wsdl:output message="tns:GetCustomerIdListResponse"/>
+		</wsdl:operation>
+
+
+		<wsdl:operation name="GetAccountList">
+			<wsdl:input message="tns:GetAccountListRequest"/>
+			<wsdl:output message="tns:GetAccountListResponse"/>
+		</wsdl:operation>
+		<wsdl:operation name="SetORValidateMPIN">
+			<wsdl:input message="tns:SetORValidateMPINRequest"/>
+			<wsdl:output message="tns:SetORValidateMPINResponse"/>
+
+		</wsdl:operation>
+		<wsdl:operation name="GetExpiryDate">
+			<wsdl:input message="tns:GetExpiryDateRequest"/>
+			<wsdl:output message="tns:GetExpiryDateResponse"/>
+		</wsdl:operation>
+		<wsdl:operation name="GetHashKey">
+			<wsdl:input message="tns:GetHashKeyRequest"/>
+			<wsdl:output message="tns:GetHashKeyResponse"/>
+		</wsdl:operation>
+
+		<wsdl:operation name="GetLatestAadhaarLinkedAcc">
+			<wsdl:input message="tns:GetLatestAadhaarLinkedAccRequest"/>
+			<wsdl:output message="tns:GetLatestAadhaarLinkedAccResponse"/>
+		</wsdl:operation>
+		
+		<wsdl:operation name="GetFundsTransferStatus">
+			<wsdl:input message="tns:GetFundsTransferStatusRequest"/>
+			<wsdl:output message="tns:GetFundsTransferStatusResponse"/>
+		</wsdl:operation>
+
+	</wsdl:portType>
+	<wsdl:binding name="UPIServiceSoapHttpBindings" type="tns:UPIService">
+		<soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+		<wsdl:operation name="GetAccountList">
+			<soap:operation soapAction="http://xmlns.yesbank.com/WS/UPIService/GetAccountList"/>
+			<wsdl:input>
+				<soap:body use="literal"/>
+			</wsdl:input>
+			<wsdl:output>
+				<soap:body use="literal"/>
+			</wsdl:output>
+		</wsdl:operation>
+		<wsdl:operation name="GetCustomerIdList">
+			<soap:operation soapAction="http://xmlns.yesbank.com/WS/UPIService/GetCustomerIdList"/>
+			<wsdl:input>
+				<soap:body use="literal"/>
+			</wsdl:input>
+			<wsdl:output>
+				<soap:body use="literal"/>
+			</wsdl:output>
+		</wsdl:operation>
+		<wsdl:operation name="SetORValidateMPIN">
+			<soap:operation soapAction="http://xmlns.yesbank.com/WS/UPIService/SetORValidateMPIN"/>
+			<wsdl:input>
+				<soap:body use="literal"/>
+			</wsdl:input>
+			<wsdl:output>
+				<soap:body use="literal"/>
+			</wsdl:output>
+		</wsdl:operation>
+		<wsdl:operation name="GetExpiryDate">
+			<soap:operation soapAction="http://xmlns.yesbank.com/WS/DebitCardManagementService/GetExpiryDate"/>
+			<wsdl:input>
+				<soap:body use="literal"/>
+			</wsdl:input>
+			<wsdl:output>
+				<soap:body use="literal"/>
+			</wsdl:output>
+		</wsdl:operation>
+		<wsdl:operation name="GetHashKey">
+			<soap:operation soapAction="http://xmlns.yesbank.com/WS/DebitCardManagementService/GetHashKey"/>
+			<wsdl:input>
+				<soap:body use="literal"/>
+			</wsdl:input>
+			<wsdl:output>
+				<soap:body use="literal"/>
+			</wsdl:output>
+		</wsdl:operation>
+		<wsdl:operation name="GetLatestAadhaarLinkedAcc">
+			<soap:operation soapAction="http://xmlns.yesbank.com/WS/UPIService/GetLatestAadhaarLinkedAcc"/>
+			<wsdl:input>
+				<soap:body use="literal"/>
+			</wsdl:input>
+			<wsdl:output>
+				<soap:body use="literal"/>
+			</wsdl:output>
+		</wsdl:operation>
+		<wsdl:operation name="GetFundsTransferStatus">
+			<soap:operation soapAction="http://xmlns.yesbank.com/WS/UPIService/GetFundsTransferStatus"/>
+			<wsdl:input>
+				<soap:body use="literal"/>
+			</wsdl:input>
+			<wsdl:output>
+				<soap:body use="literal"/>
+			</wsdl:output>
+		</wsdl:operation>
+	</wsdl:binding>
+	<wsdl:service name="UPIService">
+		<wsdl:port binding="tns:UPIServiceSoapHttpBindings" name="UPIServicePort">
+			<soap:address location="http://xmlns.yesbank.com/WS/UPIService/"/>
+		</wsdl:port>
+	</wsdl:service>
+</wsdl:definitions>

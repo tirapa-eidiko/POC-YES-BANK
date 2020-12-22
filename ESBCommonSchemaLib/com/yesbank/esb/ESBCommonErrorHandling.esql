@@ -1,0 +1,130 @@
+BROKER SCHEMA com.yesbank.esb
+
+
+CREATE COMPUTE MODULE COMMON_ERROR_HANDLING_SUBFLOW_Compute
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		 CALL CopyMessageHeaders();
+		 CALL CopyEntireMessage();
+		DECLARE cLastTracedText CHARACTER;
+		DECLARE Location 		CHARACTER;		
+		DECLARE Diagonstics 	CHARACTER;		
+		DECLARE DiagonsticsInfo CHARACTER;		
+		DECLARE width 			INTEGER;		
+		DECLARE cErrorSource 	CHARACTER;
+		DECLARE cErrorCategory  CHARACTER;
+		DECLARE cErrorText 		CHARACTER;		
+		DECLARE NodeName 		CHARACTER;		
+		DECLARE FlowName 		CHARACTER;
+		DECLARE cErrorNumber    CHARACTER;		
+		SET width = 1;		
+		DECLARE path REFERENCE TO InputExceptionList.*[width];
+		DECLARE ErrorType CHARACTER '';
+		
+		WHILE LASTMOVE(path) DO			
+			SET Diagonstics = '';
+			SET DiagonsticsInfo ='';			
+			WHILE FIELDNAME(path)= 'FatalException' 		OR
+				  FIELDNAME(path)= 'RecoverableException' 	OR
+				  FIELDNAME(path)= 'ConfigurationException' OR 
+				  FIELDNAME(path)= 'SecurityException' 		OR
+				  FIELDNAME(path)= 'ParserException' 		OR
+				  FIELDNAME(path)= 'ConversionException'	OR
+				  FIELDNAME(path)= 'DatabaseException'		OR
+				  FIELDNAME(path)= 'UserException'			OR
+				  FIELDNAME(path)= 'CastException'			OR
+				  FIELDNAME(path)= 'MessageException'		OR
+				  FIELDNAME(path)= 'SqlException'			OR
+				  FIELDNAME(path)= 'SocketException'		OR
+				  FIELDNAME(path)= 'SocketTimeoutException' OR
+				  FIELDNAME(path)= 'UnknownException'			
+				DO				
+				IF (POSITION(FIELDNAME(path) IN ErrorType)<=0) THEN					
+						SET ErrorType = ErrorType||FIELDNAME(path)||',';				
+				END IF;
+				IF LENGTH(path.Label)>0 THEN
+						SET Location = path.Label;					
+				END IF;
+				IF LENGTH(path.Text)>0 THEN
+					SET Diagonstics = Diagonstics||path.Text||'. ';
+					SET cLastTracedText = path.Text;
+					SET cErrorNumber 	= path.Number;				
+				END IF;				
+				MOVE path LASTCHILD;				
+			END WHILE;			
+			MOVE path PARENT;
+			
+			SET cErrorSource = Location;			
+			SET FlowName = SUBSTRING(cErrorSource FROM 0 FOR POSITION('.' IN cErrorSource REPEAT-1));			
+			SET NodeName = SUBSTRING(cErrorSource FROM  POSITION('.' IN cErrorSource REPEAT-1)+1);			
+			SET cErrorCategory = FIELDNAME(path);			
+			MOVE path FIRSTCHILD;
+			
+			WHILE FIELDNAME(path) <> 'Insert' AND LASTMOVE(path) DO				
+				MOVE path NEXTSIBLING;				
+			END WHILE;	
+			
+			IF FIELDNAME(path) ='Insert' THEN
+				WHILE LASTMOVE(path) DO
+					IF LENGTH(path.Text)>0 THEN						
+						SET DiagonsticsInfo = DiagonsticsInfo||path.Text||'.';
+						--SET cErrorNumber 	= path.Number;						
+					END IF;
+					MOVE path NEXTSIBLING;					
+				END WHILE;				
+			ELSE
+				SET DiagonsticsInfo = cLastTracedText;				
+			END IF;		
+					
+			SET cErrorText = DiagonsticsInfo||Diagonstics;			
+			SET cErrorText = REPLACE(cErrorText ,'<' ,'{');
+			SET cErrorText = REPLACE(cErrorText ,'>','}');
+			SET width = width+1;			
+			MOVE path TO InputExceptionList.*[width];		
+			
+		END WHILE;	
+		
+		IF FIELDVALUE(Environment.Variables.Operation.Name) IS NULL THEN
+			
+			CALL setEnvForLogging(Environment,InputRoot,InputLocalEnvironment);		
+		END IF;			
+		
+		IF(Environment.Variables.MessageFlow.LOG_LEVEL IS NULL) THEN
+		 SET Environment.Variables.MessageFlow.LOG_LEVEL=  CAST(getPolicyProperty(Environment.Variables.UserConfigurableServiceName, Environment.Variables.Operation.Name||'_LOG_LEVEL') AS INT);
+		END IF;
+		SET Environment.ErrorInfo.FlowName          =	FlowName ||'.'||NodeName;
+		SET Environment.ErrorInfo.ErrSrc 			= 	cErrorSource;		
+		SET Environment.ErrorInfo.EsbErrCode 		=	cErrorNumber;
+		SET Environment.ErrorInfo.EsbErrLongDesc 	=	cErrorText;
+		SET Environment.ErrorInfo.EsbErrShortDesc 	=	cErrorCategory;
+		
+		
+		  CREATE LASTCHILD of Environment DOMAIN('XMLNSC') Name 'ExceptionList' ; 
+           SET Environment.ExceptionList= InputExceptionList;
+	    
+	    
+		   SET  Environment.Variables.LogMessage  			= CAST('ExceptionList: ' AS BLOB CCSID 1208)|| ASBITSTREAM(Environment.ExceptionList options FolderBitStream CCSID 1208) || 
+		                                                       CAST('   InputMessage: ' AS BLOB CCSID 1208)|| ASBITSTREAM(InputRoot.*[<] options FolderBitStream CCSID 1208);
+		   SET  Environment.Variables.MessageFlowName 		= SQL.MessageFlowLabel;
+		   SET  Environment.Variables.LogPoint 				= 'ESBError';		   
+		   SET  Environment.Variables.TxnDateTime 			=  CURRENT_TIMESTAMP ;
+           SET Environment.LOGMESSAGE.LOG_LEVEL            =  1;
+		     PROPAGATE TO TERMINAL 'out1' DELETE NONE;
+		
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;
